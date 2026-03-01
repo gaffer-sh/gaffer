@@ -7,12 +7,6 @@ Test analytics and intelligence for your CI pipeline. Run tests, detect flaky te
 ```sh
 # curl
 curl -fsSL https://app.gaffer.sh/install.sh | sh
-
-# Homebrew
-brew install gaffer-sh/tap/gaffer
-
-# From source
-cargo install --path packages/cli
 ```
 
 ## Quick Start
