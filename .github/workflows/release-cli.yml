@@ -31,7 +31,7 @@ jobs:
             runner: macos-14
             use_zigbuild: false
           - target: x86_64-apple-darwin
-            runner: macos-14
+            runner: macos-15-intel
             use_zigbuild: false
           - target: x86_64-unknown-linux-gnu
             runner: ubuntu-latest
@@ -89,7 +89,12 @@ jobs:
         id: tag
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "tag=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+            TAG="${{ github.event.inputs.tag }}"
+            if ! echo "$TAG" | grep -qE '^cli-v[0-9]+\.[0-9]+\.[0-9]+'; then
+              echo "Error: Tag must match 'cli-v*' format (e.g., cli-v0.1.0). Got: $TAG"
+              exit 1
+            fi
+            echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           else
             echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
           fi
@@ -113,6 +118,16 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: artifacts
+
+      - name: Verify all artifacts present
+        run: |
+          for target in aarch64-apple-darwin x86_64-apple-darwin x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu; do
+            if [ ! -f "artifacts/gaffer-$target/gaffer-$target.tar.gz" ]; then
+              echo "Error: Missing artifact for $target"
+              exit 1
+            fi
+          done
+          echo "All 4 platform artifacts present."
 
       - name: Collect tarballs and generate checksums
         run: |
