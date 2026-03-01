@@ -1,0 +1,182 @@
+{
+  "config": {
+    "configFile": "/home/runner/project/playwright.config.ts",
+    "rootDir": "/home/runner/project",
+    "forbidOnly": false,
+    "fullyParallel": true,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {},
+    "preserveOutput": "always",
+    "reporter": [["json", { "outputFile": "results.json" }]],
+    "reportSlowTests": { "max": 5, "threshold": 15000 },
+    "quiet": false,
+    "projects": [
+      {
+        "outputDir": "/home/runner/project/test-results",
+        "repeatEach": 1,
+        "retries": 1,
+        "metadata": {},
+        "id": "",
+        "name": "",
+        "testDir": "/home/runner/project/tests",
+        "testIgnore": [],
+        "testMatch": ["**/*.spec.ts"],
+        "timeout": 30000
+      }
+    ],
+    "shard": null,
+    "updateSnapshots": "missing",
+    "version": "1.49.0",
+    "workers": 2
+  },
+  "suites": [
+    {
+      "title": "tests/home.spec.ts",
+      "file": "tests/home.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "should render homepage",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "status": "passed",
+                  "duration": 800,
+                  "errors": [],
+                  "error": null,
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-02-25T10:00:01.000Z",
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "spec-1",
+          "file": "tests/home.spec.ts",
+          "line": 3,
+          "column": 5
+        },
+        {
+          "title": "should navigate to about",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "status": "passed",
+                  "duration": 650,
+                  "errors": [],
+                  "error": null,
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-02-25T10:00:01.500Z",
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "spec-2",
+          "file": "tests/home.spec.ts",
+          "line": 10,
+          "column": 5
+        }
+      ],
+      "suites": [
+        {
+          "title": "Footer",
+          "file": "tests/home.spec.ts",
+          "line": 15,
+          "column": 0,
+          "specs": [
+            {
+              "title": "should show copyright",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "status": "failed",
+                      "duration": 1200,
+                      "errors": [
+                        { "message": "Error: expect(received).toContain(expected)\n\nExpected: \"2026\"\nReceived: \"2025\"" }
+                      ],
+                      "error": { "message": "Error: expect(received).toContain(expected)\n\nExpected: \"2026\"\nReceived: \"2025\"" },
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-02-25T10:00:02.000Z",
+                      "attachments": []
+                    },
+                    {
+                      "workerIndex": 1,
+                      "status": "failed",
+                      "duration": 1100,
+                      "errors": [
+                        { "message": "Error: expect(received).toContain(expected)\n\nExpected: \"2026\"\nReceived: \"2025\"" }
+                      ],
+                      "error": { "message": "Error: expect(received).toContain(expected)\n\nExpected: \"2026\"\nReceived: \"2025\"" },
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 1,
+                      "startTime": "2026-02-25T10:00:03.500Z",
+                      "attachments": []
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "spec-3",
+              "file": "tests/home.spec.ts",
+              "line": 16,
+              "column": 7
+            }
+          ],
+          "suites": []
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-02-25T10:00:00.000Z",
+    "duration": 5000,
+    "expected": 2,
+    "unexpected": 1,
+    "flaky": 0,
+    "skipped": 0
+  }
+}

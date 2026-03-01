@@ -1,0 +1,31 @@
+{
+  "results": {
+    "tool": {
+      "name": "pytest"
+    },
+    "summary": {
+      "tests": 2,
+      "passed": 1,
+      "failed": 1,
+      "skipped": 0,
+      "pending": 0,
+      "other": 0,
+      "start": 1000,
+      "stop": 2000
+    },
+    "tests": [
+      {
+        "name": "test_login",
+        "status": "passed",
+        "duration": 500,
+        "suite": "auth"
+      },
+      {
+        "name": "test_logout",
+        "status": "failed",
+        "duration": 300,
+        "trace": "AssertionError: expected 200\n    at test_auth.py:15"
+      }
+    ]
+  }
+}

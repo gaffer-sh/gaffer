@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="Mixed Content Suite">
+  <testsuite name="mixed" tests="3" time="0.6">
+    <testcase name="direct-first" classname="mixed" time="0.1"/>
+    <testsuite name="nested" tests="1" time="0.2">
+      <testcase name="nested-test" classname="nested" time="0.2"/>
+    </testsuite>
+    <testcase name="direct-second" classname="mixed" time="0.3"/>
+  </testsuite>
+</testsuites>

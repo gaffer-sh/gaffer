@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="Vitest Tests" tests="5" failures="0" errors="0" time="1.234">
+  <testsuite name="tests/unit/math.spec.ts" tests="3" failures="0" errors="0" time="0.5" timestamp="2024-01-15T10:30:00">
+    <testcase name="adds numbers correctly" classname="tests/unit/math.spec.ts" time="0.15"/>
+    <testcase name="subtracts numbers correctly" classname="tests/unit/math.spec.ts" time="0.12"/>
+    <testcase name="multiplies numbers correctly" classname="tests/unit/math.spec.ts" time="0.23"/>
+  </testsuite>
+  <testsuite name="tests/unit/string.spec.ts" tests="2" failures="0" errors="0" time="0.734">
+    <testcase name="concatenates strings" classname="tests/unit/string.spec.ts" time="0.334"/>
+    <testcase name="trims whitespace" classname="tests/unit/string.spec.ts" time="0.4"/>
+  </testsuite>
+</testsuites>

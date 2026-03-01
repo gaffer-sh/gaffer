@@ -1,0 +1,96 @@
+{
+  "reportFormat": "CTRF",
+  "specVersion": "0.0.1",
+  "reportId": "rpt-abc123",
+  "timestamp": "2026-02-25T10:00:00.000Z",
+  "generatedBy": "ctrf-vitest-reporter",
+  "results": {
+    "tool": {
+      "name": "vitest",
+      "version": "2.1.0",
+      "extra": { "configFile": "vitest.config.ts" }
+    },
+    "summary": {
+      "tests": 6,
+      "passed": 3,
+      "failed": 1,
+      "skipped": 1,
+      "pending": 0,
+      "other": 1,
+      "flaky": 1,
+      "suites": 2,
+      "start": 1708857600000,
+      "stop": 1708857603500,
+      "duration": 3500,
+      "extra": { "seed": 12345 }
+    },
+    "tests": [
+      {
+        "name": "adds numbers",
+        "status": "passed",
+        "duration": 12.3,
+        "id": "test-001",
+        "suite": ["Math", "Addition"],
+        "filePath": "tests/math.test.ts",
+        "line": 5
+      },
+      {
+        "name": "subtracts numbers",
+        "status": "passed",
+        "duration": 8.7,
+        "suite": ["Math", "Subtraction"],
+        "filePath": "tests/math.test.ts",
+        "line": 12
+      },
+      {
+        "name": "divides by zero",
+        "status": "failed",
+        "duration": 45.1,
+        "suite": ["Math", "Division"],
+        "message": "Expected no error but got DivisionByZero",
+        "trace": "Error: Expected no error but got DivisionByZero\n    at tests/math.test.ts:20:5\n    at Object.<anonymous> (tests/math.test.ts:18:1)",
+        "filePath": "tests/math.test.ts",
+        "line": 20
+      },
+      {
+        "name": "handles NaN",
+        "status": "skipped",
+        "duration": 0,
+        "suite": ["Math"],
+        "filePath": "tests/math.test.ts"
+      },
+      {
+        "name": "formats currency",
+        "status": "other",
+        "duration": 5.0,
+        "suite": ["Formatting"]
+      },
+      {
+        "name": "renders header",
+        "status": "passed",
+        "duration": 120.9,
+        "suite": ["UI", "Header"],
+        "flaky": true,
+        "retries": 2,
+        "filePath": "tests/ui.test.ts",
+        "line": 3
+      }
+    ],
+    "environment": {
+      "appName": "my-app",
+      "appVersion": "1.2.3",
+      "buildName": "CI Build",
+      "buildNumber": "456",
+      "buildUrl": "https://ci.example.com/builds/456",
+      "repositoryName": "my-org/my-app",
+      "repositoryUrl": "https://github.com/my-org/my-app",
+      "commit": "abc123def456",
+      "branchName": "main",
+      "osPlatform": "linux",
+      "osRelease": "22.04",
+      "osVersion": "5.15.0",
+      "testEnvironment": "ci",
+      "extra": { "runner": "github-actions" }
+    }
+  }
+}

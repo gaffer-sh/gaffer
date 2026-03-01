@@ -1,0 +1,6 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="BOM Test Suite">
+  <testsuite name="BOM Tests" tests="1" time="0.05">
+    <testcase name="handles BOM" classname="BomTest" time="0.05"/>
+  </testsuite>
+</testsuites>

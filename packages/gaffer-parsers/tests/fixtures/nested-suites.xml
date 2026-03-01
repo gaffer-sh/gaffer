@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="PHPUnit Tests">
+  <testsuite name="Project Test Suite" tests="4" failures="1" errors="0" time="0.8">
+    <testsuite name="App\\Tests\\Unit" tests="2" failures="0" errors="0" time="0.3">
+      <testcase name="testAddition" classname="App\\Tests\\Unit\\MathTest" time="0.15"/>
+      <testcase name="testSubtraction" classname="App\\Tests\\Unit\\MathTest" time="0.15"/>
+    </testsuite>
+    <testsuite name="App\\Tests\\Integration" tests="2" failures="1" errors="0" time="0.5">
+      <testcase name="testDatabaseConnection" classname="App\\Tests\\Integration\\DbTest" time="0.3"/>
+      <testcase name="testApiEndpoint" classname="App\\Tests\\Integration\\ApiTest" time="0.2">
+        <failure message="Status code mismatch">Expected 200, got 500</failure>
+      </testcase>
+    </testsuite>
+  </testsuite>
+</testsuites>

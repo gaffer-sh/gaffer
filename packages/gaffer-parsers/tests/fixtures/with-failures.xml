@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="Test Suite" tests="6" failures="2" errors="1" skipped="1" time="2.5">
+  <testsuite name="tests/unit/auth.spec.ts" tests="4" failures="1" errors="1" skipped="1" time="1.5">
+    <testcase name="authenticates valid user" classname="tests/unit/auth.spec.ts" time="0.3"/>
+    <testcase name="rejects invalid credentials" classname="tests/unit/auth.spec.ts" time="0.2">
+      <failure message="Expected 401 but got 200" type="AssertionError">
+AssertionError: Expected 401 but got 200
+    at Object.&lt;anonymous&gt; (tests/unit/auth.spec.ts:25:5)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+      </failure>
+    </testcase>
+    <testcase name="handles timeout" classname="tests/unit/auth.spec.ts" time="5.0">
+      <error message="Connection timeout" type="TimeoutError">
+TimeoutError: Connection timeout after 5000ms
+    at Timeout._onTimeout (tests/unit/auth.spec.ts:40:11)
+      </error>
+    </testcase>
+    <testcase name="pending feature" classname="tests/unit/auth.spec.ts" time="0">
+      <skipped/>
+    </testcase>
+  </testsuite>
+  <testsuite name="tests/unit/api.spec.ts" tests="2" failures="1" errors="0" time="1.0">
+    <testcase name="returns 200 for valid request" classname="tests/unit/api.spec.ts" time="0.5"/>
+    <testcase name="validates input schema" classname="tests/unit/api.spec.ts" time="0.5">
+      <failure message="Schema validation failed">
+Expected object to match schema but got validation errors:
+- "email" must be a valid email
+- "age" must be a positive number
+      </failure>
+    </testcase>
+  </testsuite>
+</testsuites>

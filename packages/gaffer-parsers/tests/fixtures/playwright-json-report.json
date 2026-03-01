@@ -1,0 +1,548 @@
+{
+  "config": {
+    "configFile": "/home/runner/project/playwright.config.ts",
+    "rootDir": "/home/runner/project",
+    "forbidOnly": false,
+    "fullyParallel": true,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {},
+    "preserveOutput": "always",
+    "reporter": [["json", { "outputFile": "results.json" }]],
+    "reportSlowTests": { "max": 5, "threshold": 15000 },
+    "quiet": false,
+    "projects": [
+      {
+        "outputDir": "/home/runner/project/test-results",
+        "repeatEach": 1,
+        "retries": 2,
+        "metadata": {},
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/home/runner/project/tests",
+        "testIgnore": [],
+        "testMatch": ["**/*.spec.ts"],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/home/runner/project/test-results",
+        "repeatEach": 1,
+        "retries": 2,
+        "metadata": {},
+        "id": "firefox",
+        "name": "firefox",
+        "testDir": "/home/runner/project/tests",
+        "testIgnore": [],
+        "testMatch": ["**/*.spec.ts"],
+        "timeout": 30000
+      }
+    ],
+    "shard": null,
+    "updateSnapshots": "missing",
+    "version": "1.49.0",
+    "workers": 4
+  },
+  "suites": [
+    {
+      "title": "tests/login.spec.ts",
+      "file": "tests/login.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "should display login form",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "status": "passed",
+                  "duration": 1250,
+                  "errors": [],
+                  "error": null,
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-02-25T10:00:01.000Z",
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            },
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "status": "passed",
+                  "duration": 1480,
+                  "errors": [],
+                  "error": null,
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-02-25T10:00:01.500Z",
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "spec-1",
+          "file": "tests/login.spec.ts",
+          "line": 3,
+          "column": 5
+        }
+      ],
+      "suites": [
+        {
+          "title": "Login Suite",
+          "file": "tests/login.spec.ts",
+          "line": 8,
+          "column": 0,
+          "specs": [
+            {
+              "title": "should login successfully",
+              "ok": true,
+              "tags": ["@smoke"],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "status": "passed",
+                      "duration": 3200,
+                      "errors": [],
+                      "error": null,
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-02-25T10:00:02.000Z",
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                },
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "status": "passed",
+                      "duration": 3500,
+                      "errors": [],
+                      "error": null,
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-02-25T10:00:02.500Z",
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "spec-2",
+              "file": "tests/login.spec.ts",
+              "line": 9,
+              "column": 7
+            },
+            {
+              "title": "should show error on invalid credentials",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "status": "failed",
+                      "duration": 5100,
+                      "errors": [
+                        {
+                          "message": "Error: expect(received).toBeVisible()\n\nExpected: visible\nReceived: hidden",
+                          "stack": "Error: expect(received).toBeVisible()\n    at tests/login.spec.ts:25:30"
+                        }
+                      ],
+                      "error": {
+                        "message": "Error: expect(received).toBeVisible()\n\nExpected: visible\nReceived: hidden",
+                        "stack": "Error: expect(received).toBeVisible()\n    at tests/login.spec.ts:25:30"
+                      },
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-02-25T10:00:05.000Z",
+                      "attachments": []
+                    },
+                    {
+                      "workerIndex": 2,
+                      "status": "failed",
+                      "duration": 5050,
+                      "errors": [
+                        {
+                          "message": "Error: expect(received).toBeVisible()\n\nExpected: visible\nReceived: hidden",
+                          "stack": "Error: expect(received).toBeVisible()\n    at tests/login.spec.ts:25:30"
+                        }
+                      ],
+                      "error": {
+                        "message": "Error: expect(received).toBeVisible()\n\nExpected: visible\nReceived: hidden",
+                        "stack": "Error: expect(received).toBeVisible()\n    at tests/login.spec.ts:25:30"
+                      },
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 1,
+                      "startTime": "2026-02-25T10:00:10.500Z",
+                      "attachments": []
+                    },
+                    {
+                      "workerIndex": 3,
+                      "status": "failed",
+                      "duration": 5000,
+                      "errors": [
+                        {
+                          "message": "Error: expect(received).toBeVisible()\n\nExpected: visible\nReceived: hidden",
+                          "stack": "Error: expect(received).toBeVisible()\n    at tests/login.spec.ts:25:30"
+                        }
+                      ],
+                      "error": {
+                        "message": "Error: expect(received).toBeVisible()\n\nExpected: visible\nReceived: hidden",
+                        "stack": "Error: expect(received).toBeVisible()\n    at tests/login.spec.ts:25:30"
+                      },
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 2,
+                      "startTime": "2026-02-25T10:00:16.000Z",
+                      "attachments": []
+                    }
+                  ],
+                  "status": "unexpected"
+                },
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "status": "failed",
+                      "duration": 5200,
+                      "errors": [
+                        {
+                          "message": "Error: expect(received).toBeVisible()\n\nExpected: visible\nReceived: hidden",
+                          "stack": "Error: expect(received).toBeVisible()\n    at tests/login.spec.ts:25:30"
+                        }
+                      ],
+                      "error": {
+                        "message": "Error: expect(received).toBeVisible()\n\nExpected: visible\nReceived: hidden",
+                        "stack": "Error: expect(received).toBeVisible()\n    at tests/login.spec.ts:25:30"
+                      },
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-02-25T10:00:05.500Z",
+                      "attachments": []
+                    },
+                    {
+                      "workerIndex": 3,
+                      "status": "failed",
+                      "duration": 5150,
+                      "errors": [
+                        {
+                          "message": "Error: expect(received).toBeVisible()\n\nExpected: visible\nReceived: hidden",
+                          "stack": "Error: expect(received).toBeVisible()\n    at tests/login.spec.ts:25:30"
+                        }
+                      ],
+                      "error": {
+                        "message": "Error: expect(received).toBeVisible()\n\nExpected: visible\nReceived: hidden",
+                        "stack": "Error: expect(received).toBeVisible()\n    at tests/login.spec.ts:25:30"
+                      },
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 1,
+                      "startTime": "2026-02-25T10:00:11.000Z",
+                      "attachments": []
+                    },
+                    {
+                      "workerIndex": 0,
+                      "status": "failed",
+                      "duration": 5100,
+                      "errors": [
+                        {
+                          "message": "Error: expect(received).toBeVisible()\n\nExpected: visible\nReceived: hidden",
+                          "stack": "Error: expect(received).toBeVisible()\n    at tests/login.spec.ts:25:30"
+                        }
+                      ],
+                      "error": {
+                        "message": "Error: expect(received).toBeVisible()\n\nExpected: visible\nReceived: hidden",
+                        "stack": "Error: expect(received).toBeVisible()\n    at tests/login.spec.ts:25:30"
+                      },
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 2,
+                      "startTime": "2026-02-25T10:00:16.500Z",
+                      "attachments": []
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "spec-3",
+              "file": "tests/login.spec.ts",
+              "line": 20,
+              "column": 7
+            }
+          ],
+          "suites": []
+        }
+      ]
+    },
+    {
+      "title": "tests/dashboard.spec.ts",
+      "file": "tests/dashboard.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "should skip on mobile",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [{ "type": "skip", "description": "Not supported on mobile" }],
+              "expectedStatus": "skipped",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            },
+            {
+              "timeout": 30000,
+              "annotations": [{ "type": "skip", "description": "Not supported on mobile" }],
+              "expectedStatus": "skipped",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "spec-4",
+          "file": "tests/dashboard.spec.ts",
+          "line": 3,
+          "column": 5
+        },
+        {
+          "title": "should load dashboard",
+          "ok": true,
+          "tags": ["@smoke", "@critical"],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "status": "failed",
+                  "duration": 2000,
+                  "errors": [{ "message": "Temporary network error" }],
+                  "error": { "message": "Temporary network error" },
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-02-25T10:00:20.000Z",
+                  "attachments": []
+                },
+                {
+                  "workerIndex": 2,
+                  "status": "passed",
+                  "duration": 2100,
+                  "errors": [],
+                  "error": null,
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 1,
+                  "startTime": "2026-02-25T10:00:22.500Z",
+                  "attachments": []
+                }
+              ],
+              "status": "flaky"
+            },
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "status": "passed",
+                  "duration": 2300,
+                  "errors": [],
+                  "error": null,
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-02-25T10:00:20.500Z",
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "spec-5",
+          "file": "tests/dashboard.spec.ts",
+          "line": 8,
+          "column": 5
+        },
+        {
+          "title": "should timeout on slow network",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 5000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "status": "timedOut",
+                  "duration": 5000,
+                  "errors": [{ "message": "Test timeout of 5000ms exceeded." }],
+                  "error": { "message": "Test timeout of 5000ms exceeded." },
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-02-25T10:00:25.000Z",
+                  "attachments": []
+                },
+                {
+                  "workerIndex": 2,
+                  "status": "timedOut",
+                  "duration": 5000,
+                  "errors": [{ "message": "Test timeout of 5000ms exceeded." }],
+                  "error": { "message": "Test timeout of 5000ms exceeded." },
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 1,
+                  "startTime": "2026-02-25T10:00:30.500Z",
+                  "attachments": []
+                },
+                {
+                  "workerIndex": 3,
+                  "status": "timedOut",
+                  "duration": 5000,
+                  "errors": [{ "message": "Test timeout of 5000ms exceeded." }],
+                  "error": { "message": "Test timeout of 5000ms exceeded." },
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 2,
+                  "startTime": "2026-02-25T10:00:36.000Z",
+                  "attachments": []
+                }
+              ],
+              "status": "unexpected"
+            },
+            {
+              "timeout": 5000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "status": "timedOut",
+                  "duration": 5000,
+                  "errors": [{ "message": "Test timeout of 5000ms exceeded." }],
+                  "error": { "message": "Test timeout of 5000ms exceeded." },
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-02-25T10:00:25.500Z",
+                  "attachments": []
+                },
+                {
+                  "workerIndex": 3,
+                  "status": "timedOut",
+                  "duration": 5000,
+                  "errors": [{ "message": "Test timeout of 5000ms exceeded." }],
+                  "error": { "message": "Test timeout of 5000ms exceeded." },
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 1,
+                  "startTime": "2026-02-25T10:00:31.000Z",
+                  "attachments": []
+                },
+                {
+                  "workerIndex": 0,
+                  "status": "timedOut",
+                  "duration": 5000,
+                  "errors": [{ "message": "Test timeout of 5000ms exceeded." }],
+                  "error": { "message": "Test timeout of 5000ms exceeded." },
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 2,
+                  "startTime": "2026-02-25T10:00:36.500Z",
+                  "attachments": []
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "spec-6",
+          "file": "tests/dashboard.spec.ts",
+          "line": 15,
+          "column": 5
+        }
+      ],
+      "suites": []
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-02-25T10:00:00.000Z",
+    "duration": 42000,
+    "expected": 5,
+    "unexpected": 4,
+    "flaky": 1,
+    "skipped": 2
+  }
+}

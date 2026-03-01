@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="Single Test Suite" tests="3" failures="0" errors="0" time="0.75" file="tests/single.spec.ts">
+  <testcase name="test one" classname="Single Test Suite" time="0.25" file="tests/single.spec.ts" line="5"/>
+  <testcase name="test two" classname="Single Test Suite" time="0.25" file="tests/single.spec.ts" line="10"/>
+  <testcase name="test three" classname="Single Test Suite" time="0.25" file="tests/single.spec.ts" line="15"/>
+</testsuite>

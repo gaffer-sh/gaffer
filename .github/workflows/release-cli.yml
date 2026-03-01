@@ -1,0 +1,133 @@
+name: Release CLI
+
+on:
+  push:
+    tags:
+      - 'cli-v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g. cli-v0.1.0)'
+        required: true
+
+# Only runs in the public repo (gaffer-sh/gaffer). Synced from monorepo via scripts/sync-cli-repo.sh.
+concurrency:
+  group: release-cli-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    if: github.repository == 'gaffer-sh/gaffer'
+    strategy:
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            runner: macos-14
+            use_zigbuild: false
+          - target: x86_64-apple-darwin
+            runner: macos-13
+            use_zigbuild: false
+          - target: x86_64-unknown-linux-gnu
+            runner: ubuntu-latest
+            use_zigbuild: true
+          - target: aarch64-unknown-linux-gnu
+            runner: ubuntu-latest
+            use_zigbuild: true
+
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: Install cargo-zigbuild
+        if: matrix.use_zigbuild
+        run: pip3 install ziglang && cargo install cargo-zigbuild
+
+      - name: Build (native)
+        if: "!matrix.use_zigbuild"
+        run: cargo build --release --target ${{ matrix.target }} -p gaffer
+
+      - name: Build (zigbuild)
+        if: matrix.use_zigbuild
+        run: cargo zigbuild --release --target ${{ matrix.target }} -p gaffer
+
+      - name: Package
+        run: |
+          cd target/${{ matrix.target }}/release
+          tar czf ../../../gaffer-${{ matrix.target }}.tar.gz gaffer
+          cd ../../..
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gaffer-${{ matrix.target }}
+          path: gaffer-${{ matrix.target }}.tar.gz
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determine tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+          VERSION="${TAG#cli-v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Verify version matches Cargo.toml
+        run: |
+          CARGO_VERSION=$(grep '^version' packages/cli/Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          if [ "$CARGO_VERSION" != "${{ steps.version.outputs.version }}" ]; then
+            echo "Error: Tag version (${{ steps.version.outputs.version }}) does not match Cargo.toml version ($CARGO_VERSION)"
+            exit 1
+          fi
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Collect tarballs and generate checksums
+        run: |
+          mkdir -p release
+          cp artifacts/gaffer-*/gaffer-*.tar.gz release/
+          cd release
+          sha256sum gaffer-*.tar.gz > checksums.txt
+          cat checksums.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: Gaffer CLI ${{ steps.version.outputs.version }}
+          files: |
+            release/gaffer-*.tar.gz
+            release/checksums.txt
+          generate_release_notes: true

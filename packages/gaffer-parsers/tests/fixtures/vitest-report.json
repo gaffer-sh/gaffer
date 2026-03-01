@@ -1,0 +1,78 @@
+{
+  "numTotalTestSuites": 2,
+  "numPassedTestSuites": 2,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 5,
+  "numPassedTests": 4,
+  "numFailedTests": 0,
+  "numPendingTests": 1,
+  "numTodoTests": 0,
+  "startTime": 1764894139853,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Calculator", "add"],
+          "fullName": "Calculator add should add two positive numbers",
+          "status": "passed",
+          "title": "should add two positive numbers",
+          "duration": 1.2699590000000285,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Calculator", "add"],
+          "fullName": "Calculator add should handle negative numbers",
+          "status": "passed",
+          "title": "should handle negative numbers",
+          "duration": 0.45,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Calculator", "add"],
+          "fullName": "Calculator add pending feature",
+          "status": "pending",
+          "title": "pending feature",
+          "duration": 0,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1764894140126,
+      "endTime": 1764894140630,
+      "status": "passed",
+      "message": "",
+      "name": "/home/runner/work/project/tests/calculator.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["StringUtils"],
+          "fullName": "StringUtils should trim whitespace",
+          "status": "passed",
+          "title": "should trim whitespace",
+          "duration": 2.5,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["StringUtils"],
+          "fullName": "StringUtils should uppercase",
+          "status": "passed",
+          "title": "should uppercase",
+          "duration": 1.0,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1764894140700,
+      "endTime": 1764894141200,
+      "status": "passed",
+      "message": "",
+      "name": "/home/runner/work/project/src/utils/string.test.ts"
+    }
+  ]
+}

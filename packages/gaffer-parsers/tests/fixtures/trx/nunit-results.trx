@@ -1,0 +1,154 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="0bdcaee4-fdf4-40d7-a8ab-333bb292ab46" name="@0a058d23b6f8 2025-12-16 16:41:59" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2025-12-16T16:41:59.4435922+00:00" queuing="2025-12-16T16:41:59.4435922+00:00" start="2025-12-16T16:41:59.2029384+00:00" finish="2025-12-16T16:41:59.4543976+00:00" />
+  <TestSettings name="default" id="d69739f7-4478-4341-9249-2b61fb23c4b1">
+    <Deployment runDeploymentRoot="_0a058d23b6f8_2025-12-16_16_41_59" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="a63811c4-388d-4399-a9d1-2686b9e2ca46" testId="eeda46bb-6c97-8432-26d6-b91e2ba91216" testName="Add_MultipleInputs_ReturnsExpectedSum(0,0,0)" computerName="0a058d23b6f8" duration="00:00:00.0000060" startTime="2025-12-16T16:41:59.4007428+00:00" endTime="2025-12-16T16:41:59.4007491+00:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="a63811c4-388d-4399-a9d1-2686b9e2ca46" />
+    <UnitTestResult executionId="b832a5b6-b776-4c8e-9e99-6c58bc5c06bc" testId="dbc34ef5-133f-8c21-3269-f2419bb03b8c" testName="InconclusiveTest_DemonstratesInconclusive" computerName="0a058d23b6f8" duration="00:00:00.0001640" startTime="2025-12-16T16:41:59.4140629+00:00" endTime="2025-12-16T16:41:59.4142270+00:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="NotExecuted" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="b832a5b6-b776-4c8e-9e99-6c58bc5c06bc">
+      <Output>
+        <StdOut>Test result is inconclusive - requires manual verification</StdOut>
+        <ErrorInfo>
+          <Message>Test result is inconclusive - requires manual verification</Message>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="72f6616d-22c9-487e-9df3-302d3d161b42" testId="053e9408-aecb-bbda-f7af-4513c3ff57f9" testName="Multiply_TwoNumbers_ReturnsProduct" computerName="0a058d23b6f8" duration="00:00:00.0000600" startTime="2025-12-16T16:41:59.4142309+00:00" endTime="2025-12-16T16:41:59.4142909+00:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="72f6616d-22c9-487e-9df3-302d3d161b42" />
+    <UnitTestResult executionId="3029c617-6afa-4348-af52-f002333e12f4" testId="d6c2b2e1-d06c-2e2d-8bc8-ad8d27df26c7" testName="Reverse_ValidString_ReturnsReversed" computerName="0a058d23b6f8" duration="00:00:00.0001380" startTime="2025-12-16T16:41:59.4153498+00:00" endTime="2025-12-16T16:41:59.4154874+00:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="3029c617-6afa-4348-af52-f002333e12f4" />
+    <UnitTestResult executionId="1a747841-8722-4fb0-a77a-9749461d2a2f" testId="7bf5e766-9166-ae3d-56ba-516e70a8108c" testName="IsPalindrome_NonPalindrome_ReturnsFalse" computerName="0a058d23b6f8" duration="00:00:00.0003510" startTime="2025-12-16T16:41:59.4147880+00:00" endTime="2025-12-16T16:41:59.4151390+00:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="1a747841-8722-4fb0-a77a-9749461d2a2f" />
+    <UnitTestResult executionId="e618ad69-361d-4f35-85bf-5cd5f44ef5bb" testId="6f4296c5-b578-aee9-cce5-e3fa82a2b2ec" testName="Subtract_TwoNumbers_ReturnsDifference" computerName="0a058d23b6f8" duration="00:00:00.0000410" startTime="2025-12-16T16:41:59.4143705+00:00" endTime="2025-12-16T16:41:59.4144112+00:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="e618ad69-361d-4f35-85bf-5cd5f44ef5bb" />
+    <UnitTestResult executionId="b84c7f31-aa74-4b19-9c75-9d0d6033add6" testId="16952359-dfd9-0bd7-348b-6cf0935ef14e" testName="SkippedTest_DemonstratesIgnore" computerName="0a058d23b6f8" duration="00:00:00.0000749" startTime="2025-12-16T16:41:59.4142936+00:00" endTime="2025-12-16T16:41:59.4143681+00:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="NotExecuted" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="b84c7f31-aa74-4b19-9c75-9d0d6033add6">
+      <Output>
+        <StdOut>Skipped for demonstration - feature not yet implemented</StdOut>
+        <ErrorInfo>
+          <Message>Skipped for demonstration - feature not yet implemented</Message>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="5cbb6da3-38eb-446c-8fd0-ccadfc9dab66" testId="c87ecaf3-c673-7a05-7f19-d540f5ea3b45" testName="IsPalindrome_Palindrome_ReturnsTrue" computerName="0a058d23b6f8" duration="00:00:00.0000680" startTime="2025-12-16T16:41:59.4151431+00:00" endTime="2025-12-16T16:41:59.4152115+00:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="5cbb6da3-38eb-446c-8fd0-ccadfc9dab66" />
+    <UnitTestResult executionId="25d3d5f9-e8e1-4984-bef2-5c4e622d3e9d" testId="a1442c6e-e4f5-486d-0ac7-6d9b2a445abf" testName="FailingTest_DemonstratesFailure" computerName="0a058d23b6f8" duration="00:00:00.0113380" startTime="2025-12-16T16:41:59.4026853+00:00" endTime="2025-12-16T16:41:59.4140233+00:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="25d3d5f9-e8e1-4984-bef2-5c4e622d3e9d">
+      <Output>
+        <ErrorInfo>
+          <Message>  Assert.That(_calculator.Add(1, 1), Is.EqualTo(100))
+  Expected: 100
+  But was:  2.0d
+</Message>
+          <StackTrace>   at Calculator.NUnit.Tests.CalculatorTests.FailingTest_DemonstratesFailure() in /app/tests/Calculator.NUnit.Tests/CalculatorTests.cs:line 58
+
+1)    at Calculator.NUnit.Tests.CalculatorTests.FailingTest_DemonstratesFailure() in /app/tests/Calculator.NUnit.Tests/CalculatorTests.cs:line 58
+
+</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="afc67503-f357-47dd-97ed-091c7a693dde" testId="4ddc2774-cf90-97d9-68da-77109679df3c" testName="Add_MultipleInputs_ReturnsExpectedSum(1,2,3)" computerName="0a058d23b6f8" duration="00:00:00.0032360" startTime="2025-12-16T16:41:59.3969323+00:00" endTime="2025-12-16T16:41:59.4001503+00:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="afc67503-f357-47dd-97ed-091c7a693dde" />
+    <UnitTestResult executionId="fb67a0cc-ec7b-4e44-a67d-1212929f7736" testId="9aaebf51-679c-794c-9c18-1bc3f37e9736" testName="Add_MultipleInputs_ReturnsExpectedSum(-1,-1,-2)" computerName="0a058d23b6f8" duration="00:00:00.0001610" startTime="2025-12-16T16:41:59.4005751+00:00" endTime="2025-12-16T16:41:59.4007356+00:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="fb67a0cc-ec7b-4e44-a67d-1212929f7736" />
+    <UnitTestResult executionId="7b942058-ae35-4f43-981c-cc7dabd1d841" testId="e439ead3-cd64-db85-cf6c-73ad17ae24d1" testName="Add_NegativeNumbers_ReturnsCorrectSum" computerName="0a058d23b6f8" duration="00:00:00.0000670" startTime="2025-12-16T16:41:59.4011362+00:00" endTime="2025-12-16T16:41:59.4012034+00:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="7b942058-ae35-4f43-981c-cc7dabd1d841" />
+    <UnitTestResult executionId="1b0e8443-38c8-4f25-9fc5-62360e4cf173" testId="9360c078-ce21-ef75-4e9d-7c5568cd70cf" testName="Add_TwoPositiveNumbers_ReturnsSum" computerName="0a058d23b6f8" duration="00:00:00.0000290" startTime="2025-12-16T16:41:59.4012062+00:00" endTime="2025-12-16T16:41:59.4012351+00:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="1b0e8443-38c8-4f25-9fc5-62360e4cf173" />
+    <UnitTestResult executionId="c8dc0481-54f1-481b-833d-737ed4f876de" testId="b9a24335-7a2c-53f6-11f9-7cf7cc194af7" testName="Divide_TwoNumbers_ReturnsQuotient" computerName="0a058d23b6f8" duration="00:00:00.0000340" startTime="2025-12-16T16:41:59.4026491+00:00" endTime="2025-12-16T16:41:59.4026830+00:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="c8dc0481-54f1-481b-833d-737ed4f876de" />
+    <UnitTestResult executionId="f6dbdb77-1ccc-4f43-b608-1cfa038801c2" testId="369efaf2-ea89-cca5-9d14-46d850edfd2f" testName="Divide_ByZero_ThrowsDivideByZeroException" computerName="0a058d23b6f8" duration="00:00:00.0014080" startTime="2025-12-16T16:41:59.4012373+00:00" endTime="2025-12-16T16:41:59.4026453+00:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="f6dbdb77-1ccc-4f43-b608-1cfa038801c2" />
+    <UnitTestResult executionId="409850dd-944b-4d36-af93-a93b84161f60" testId="2821144d-c64a-858f-8b2c-807b29a4c1c0" testName="Reverse_NullInput_ThrowsArgumentNullException" computerName="0a058d23b6f8" duration="00:00:00.0001340" startTime="2025-12-16T16:41:59.4152136+00:00" endTime="2025-12-16T16:41:59.4153473+00:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="409850dd-944b-4d36-af93-a93b84161f60" />
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="Divide_TwoNumbers_ReturnsQuotient" storage="/app/tests/calculator.nunit.tests/bin/debug/net8.0/calculator.nunit.tests.dll" id="b9a24335-7a2c-53f6-11f9-7cf7cc194af7">
+      <Execution id="c8dc0481-54f1-481b-833d-737ed4f876de" />
+      <TestMethod codeBase="/app/tests/Calculator.NUnit.Tests/bin/Debug/net8.0/Calculator.NUnit.Tests.dll" adapterTypeName="executor://nunit3testexecutor/" className="Calculator.NUnit.Tests.CalculatorTests" name="Divide_TwoNumbers_ReturnsQuotient" />
+    </UnitTest>
+    <UnitTest name="Add_TwoPositiveNumbers_ReturnsSum" storage="/app/tests/calculator.nunit.tests/bin/debug/net8.0/calculator.nunit.tests.dll" id="9360c078-ce21-ef75-4e9d-7c5568cd70cf">
+      <Execution id="1b0e8443-38c8-4f25-9fc5-62360e4cf173" />
+      <TestMethod codeBase="/app/tests/Calculator.NUnit.Tests/bin/Debug/net8.0/Calculator.NUnit.Tests.dll" adapterTypeName="executor://nunit3testexecutor/" className="Calculator.NUnit.Tests.CalculatorTests" name="Add_TwoPositiveNumbers_ReturnsSum" />
+    </UnitTest>
+    <UnitTest name="InconclusiveTest_DemonstratesInconclusive" storage="/app/tests/calculator.nunit.tests/bin/debug/net8.0/calculator.nunit.tests.dll" id="dbc34ef5-133f-8c21-3269-f2419bb03b8c">
+      <Execution id="b832a5b6-b776-4c8e-9e99-6c58bc5c06bc" />
+      <TestMethod codeBase="/app/tests/Calculator.NUnit.Tests/bin/Debug/net8.0/Calculator.NUnit.Tests.dll" adapterTypeName="executor://nunit3testexecutor/" className="Calculator.NUnit.Tests.CalculatorTests" name="InconclusiveTest_DemonstratesInconclusive" />
+    </UnitTest>
+    <UnitTest name="Add_MultipleInputs_ReturnsExpectedSum(1,2,3)" storage="/app/tests/calculator.nunit.tests/bin/debug/net8.0/calculator.nunit.tests.dll" id="4ddc2774-cf90-97d9-68da-77109679df3c">
+      <Execution id="afc67503-f357-47dd-97ed-091c7a693dde" />
+      <TestMethod codeBase="/app/tests/Calculator.NUnit.Tests/bin/Debug/net8.0/Calculator.NUnit.Tests.dll" adapterTypeName="executor://nunit3testexecutor/" className="Calculator.NUnit.Tests.CalculatorTests" name="Add_MultipleInputs_ReturnsExpectedSum(1,2,3)" />
+    </UnitTest>
+    <UnitTest name="Add_MultipleInputs_ReturnsExpectedSum(0,0,0)" storage="/app/tests/calculator.nunit.tests/bin/debug/net8.0/calculator.nunit.tests.dll" id="eeda46bb-6c97-8432-26d6-b91e2ba91216">
+      <Execution id="a63811c4-388d-4399-a9d1-2686b9e2ca46" />
+      <TestMethod codeBase="/app/tests/Calculator.NUnit.Tests/bin/Debug/net8.0/Calculator.NUnit.Tests.dll" adapterTypeName="executor://nunit3testexecutor/" className="Calculator.NUnit.Tests.CalculatorTests" name="Add_MultipleInputs_ReturnsExpectedSum(0,0,0)" />
+    </UnitTest>
+    <UnitTest name="IsPalindrome_Palindrome_ReturnsTrue" storage="/app/tests/calculator.nunit.tests/bin/debug/net8.0/calculator.nunit.tests.dll" id="c87ecaf3-c673-7a05-7f19-d540f5ea3b45">
+      <Execution id="5cbb6da3-38eb-446c-8fd0-ccadfc9dab66" />
+      <TestMethod codeBase="/app/tests/Calculator.NUnit.Tests/bin/Debug/net8.0/Calculator.NUnit.Tests.dll" adapterTypeName="executor://nunit3testexecutor/" className="Calculator.NUnit.Tests.StringUtilsTests" name="IsPalindrome_Palindrome_ReturnsTrue" />
+    </UnitTest>
+    <UnitTest name="Add_NegativeNumbers_ReturnsCorrectSum" storage="/app/tests/calculator.nunit.tests/bin/debug/net8.0/calculator.nunit.tests.dll" id="e439ead3-cd64-db85-cf6c-73ad17ae24d1">
+      <Execution id="7b942058-ae35-4f43-981c-cc7dabd1d841" />
+      <TestMethod codeBase="/app/tests/Calculator.NUnit.Tests/bin/Debug/net8.0/Calculator.NUnit.Tests.dll" adapterTypeName="executor://nunit3testexecutor/" className="Calculator.NUnit.Tests.CalculatorTests" name="Add_NegativeNumbers_ReturnsCorrectSum" />
+    </UnitTest>
+    <UnitTest name="Reverse_NullInput_ThrowsArgumentNullException" storage="/app/tests/calculator.nunit.tests/bin/debug/net8.0/calculator.nunit.tests.dll" id="2821144d-c64a-858f-8b2c-807b29a4c1c0">
+      <Execution id="409850dd-944b-4d36-af93-a93b84161f60" />
+      <TestMethod codeBase="/app/tests/Calculator.NUnit.Tests/bin/Debug/net8.0/Calculator.NUnit.Tests.dll" adapterTypeName="executor://nunit3testexecutor/" className="Calculator.NUnit.Tests.StringUtilsTests" name="Reverse_NullInput_ThrowsArgumentNullException" />
+    </UnitTest>
+    <UnitTest name="IsPalindrome_NonPalindrome_ReturnsFalse" storage="/app/tests/calculator.nunit.tests/bin/debug/net8.0/calculator.nunit.tests.dll" id="7bf5e766-9166-ae3d-56ba-516e70a8108c">
+      <Execution id="1a747841-8722-4fb0-a77a-9749461d2a2f" />
+      <TestMethod codeBase="/app/tests/Calculator.NUnit.Tests/bin/Debug/net8.0/Calculator.NUnit.Tests.dll" adapterTypeName="executor://nunit3testexecutor/" className="Calculator.NUnit.Tests.StringUtilsTests" name="IsPalindrome_NonPalindrome_ReturnsFalse" />
+    </UnitTest>
+    <UnitTest name="FailingTest_DemonstratesFailure" storage="/app/tests/calculator.nunit.tests/bin/debug/net8.0/calculator.nunit.tests.dll" id="a1442c6e-e4f5-486d-0ac7-6d9b2a445abf">
+      <Execution id="25d3d5f9-e8e1-4984-bef2-5c4e622d3e9d" />
+      <TestMethod codeBase="/app/tests/Calculator.NUnit.Tests/bin/Debug/net8.0/Calculator.NUnit.Tests.dll" adapterTypeName="executor://nunit3testexecutor/" className="Calculator.NUnit.Tests.CalculatorTests" name="FailingTest_DemonstratesFailure" />
+    </UnitTest>
+    <UnitTest name="Divide_ByZero_ThrowsDivideByZeroException" storage="/app/tests/calculator.nunit.tests/bin/debug/net8.0/calculator.nunit.tests.dll" id="369efaf2-ea89-cca5-9d14-46d850edfd2f">
+      <Execution id="f6dbdb77-1ccc-4f43-b608-1cfa038801c2" />
+      <TestMethod codeBase="/app/tests/Calculator.NUnit.Tests/bin/Debug/net8.0/Calculator.NUnit.Tests.dll" adapterTypeName="executor://nunit3testexecutor/" className="Calculator.NUnit.Tests.CalculatorTests" name="Divide_ByZero_ThrowsDivideByZeroException" />
+    </UnitTest>
+    <UnitTest name="Reverse_ValidString_ReturnsReversed" storage="/app/tests/calculator.nunit.tests/bin/debug/net8.0/calculator.nunit.tests.dll" id="d6c2b2e1-d06c-2e2d-8bc8-ad8d27df26c7">
+      <Execution id="3029c617-6afa-4348-af52-f002333e12f4" />
+      <TestMethod codeBase="/app/tests/Calculator.NUnit.Tests/bin/Debug/net8.0/Calculator.NUnit.Tests.dll" adapterTypeName="executor://nunit3testexecutor/" className="Calculator.NUnit.Tests.StringUtilsTests" name="Reverse_ValidString_ReturnsReversed" />
+    </UnitTest>
+    <UnitTest name="Add_MultipleInputs_ReturnsExpectedSum(-1,-1,-2)" storage="/app/tests/calculator.nunit.tests/bin/debug/net8.0/calculator.nunit.tests.dll" id="9aaebf51-679c-794c-9c18-1bc3f37e9736">
+      <Execution id="fb67a0cc-ec7b-4e44-a67d-1212929f7736" />
+      <TestMethod codeBase="/app/tests/Calculator.NUnit.Tests/bin/Debug/net8.0/Calculator.NUnit.Tests.dll" adapterTypeName="executor://nunit3testexecutor/" className="Calculator.NUnit.Tests.CalculatorTests" name="Add_MultipleInputs_ReturnsExpectedSum(-1,-1,-2)" />
+    </UnitTest>
+    <UnitTest name="SkippedTest_DemonstratesIgnore" storage="/app/tests/calculator.nunit.tests/bin/debug/net8.0/calculator.nunit.tests.dll" id="16952359-dfd9-0bd7-348b-6cf0935ef14e">
+      <Execution id="b84c7f31-aa74-4b19-9c75-9d0d6033add6" />
+      <TestMethod codeBase="/app/tests/Calculator.NUnit.Tests/bin/Debug/net8.0/Calculator.NUnit.Tests.dll" adapterTypeName="executor://nunit3testexecutor/" className="Calculator.NUnit.Tests.CalculatorTests" name="SkippedTest_DemonstratesIgnore" />
+    </UnitTest>
+    <UnitTest name="Multiply_TwoNumbers_ReturnsProduct" storage="/app/tests/calculator.nunit.tests/bin/debug/net8.0/calculator.nunit.tests.dll" id="053e9408-aecb-bbda-f7af-4513c3ff57f9">
+      <Execution id="72f6616d-22c9-487e-9df3-302d3d161b42" />
+      <TestMethod codeBase="/app/tests/Calculator.NUnit.Tests/bin/Debug/net8.0/Calculator.NUnit.Tests.dll" adapterTypeName="executor://nunit3testexecutor/" className="Calculator.NUnit.Tests.CalculatorTests" name="Multiply_TwoNumbers_ReturnsProduct" />
+    </UnitTest>
+    <UnitTest name="Subtract_TwoNumbers_ReturnsDifference" storage="/app/tests/calculator.nunit.tests/bin/debug/net8.0/calculator.nunit.tests.dll" id="6f4296c5-b578-aee9-cce5-e3fa82a2b2ec">
+      <Execution id="e618ad69-361d-4f35-85bf-5cd5f44ef5bb" />
+      <TestMethod codeBase="/app/tests/Calculator.NUnit.Tests/bin/Debug/net8.0/Calculator.NUnit.Tests.dll" adapterTypeName="executor://nunit3testexecutor/" className="Calculator.NUnit.Tests.CalculatorTests" name="Subtract_TwoNumbers_ReturnsDifference" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="eeda46bb-6c97-8432-26d6-b91e2ba91216" executionId="a63811c4-388d-4399-a9d1-2686b9e2ca46" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="dbc34ef5-133f-8c21-3269-f2419bb03b8c" executionId="b832a5b6-b776-4c8e-9e99-6c58bc5c06bc" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="053e9408-aecb-bbda-f7af-4513c3ff57f9" executionId="72f6616d-22c9-487e-9df3-302d3d161b42" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="d6c2b2e1-d06c-2e2d-8bc8-ad8d27df26c7" executionId="3029c617-6afa-4348-af52-f002333e12f4" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="7bf5e766-9166-ae3d-56ba-516e70a8108c" executionId="1a747841-8722-4fb0-a77a-9749461d2a2f" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="6f4296c5-b578-aee9-cce5-e3fa82a2b2ec" executionId="e618ad69-361d-4f35-85bf-5cd5f44ef5bb" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="16952359-dfd9-0bd7-348b-6cf0935ef14e" executionId="b84c7f31-aa74-4b19-9c75-9d0d6033add6" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="c87ecaf3-c673-7a05-7f19-d540f5ea3b45" executionId="5cbb6da3-38eb-446c-8fd0-ccadfc9dab66" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="a1442c6e-e4f5-486d-0ac7-6d9b2a445abf" executionId="25d3d5f9-e8e1-4984-bef2-5c4e622d3e9d" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="4ddc2774-cf90-97d9-68da-77109679df3c" executionId="afc67503-f357-47dd-97ed-091c7a693dde" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="9aaebf51-679c-794c-9c18-1bc3f37e9736" executionId="fb67a0cc-ec7b-4e44-a67d-1212929f7736" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="e439ead3-cd64-db85-cf6c-73ad17ae24d1" executionId="7b942058-ae35-4f43-981c-cc7dabd1d841" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="9360c078-ce21-ef75-4e9d-7c5568cd70cf" executionId="1b0e8443-38c8-4f25-9fc5-62360e4cf173" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="b9a24335-7a2c-53f6-11f9-7cf7cc194af7" executionId="c8dc0481-54f1-481b-833d-737ed4f876de" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="369efaf2-ea89-cca5-9d14-46d850edfd2f" executionId="f6dbdb77-1ccc-4f43-b608-1cfa038801c2" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="2821144d-c64a-858f-8b2c-807b29a4c1c0" executionId="409850dd-944b-4d36-af93-a93b84161f60" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Failed">
+    <Counters total="16" executed="14" passed="13" failed="1" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>NUnit Adapter 4.6.0.0: Test execution started
+Running all tests in /app/tests/Calculator.NUnit.Tests/bin/Debug/net8.0/Calculator.NUnit.Tests.dll
+   NUnit3TestExecutor discovered 16 of 16 NUnit test cases using Current Discovery mode, Non-Explicit run
+InconclusiveTest_DemonstratesInconclusive: Test result is inconclusive - requires manual verification
+SkippedTest_DemonstratesIgnore: Skipped for demonstration - feature not yet implemented
+NUnit Adapter 4.6.0.0: Test execution complete
+Test 'SkippedTest_DemonstratesIgnore' was skipped in the test run.
+</StdOut>
+    </Output>
+  </ResultSummary>
+</TestRun>
