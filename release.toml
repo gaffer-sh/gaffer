@@ -1,4 +1,3 @@
-[workspace]
 sign-tag = false
 push-remote = "origin"
 tag-prefix = "cli-"
