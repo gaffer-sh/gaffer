@@ -96,16 +96,23 @@ impl ParserRegistry {
     }
 
     fn find_best(&self, content: &str, filename: &str) -> Option<(&dyn Parser, u8)> {
-        self.parsers
-            .iter()
-            .map(|p| {
-                let score = p.detect(content, filename);
-                (p.as_ref(), score)
-            })
-            .filter(|(_, score)| *score >= DETECTION_THRESHOLD)
-            .max_by(|(a, a_score), (b, b_score)| {
-                a_score.cmp(b_score).then_with(|| a.priority().cmp(&b.priority()))
-            })
+        let mut best: Option<(&dyn Parser, u8)> = None;
+        for p in &self.parsers {
+            let score = p.detect(content, filename);
+            if score == 100 {
+                return Some((p.as_ref(), 100));
+            }
+            if score >= DETECTION_THRESHOLD {
+                best = Some(match best {
+                    Some((bp, bs)) if score > bs || (score == bs && p.priority() > bp.priority()) => {
+                        (p.as_ref(), score)
+                    }
+                    Some(prev) => prev,
+                    None => (p.as_ref(), score),
+                });
+            }
+        }
+        best
     }
 
     pub fn parser_ids(&self) -> Vec<&str> {

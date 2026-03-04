@@ -1,16 +1,18 @@
 //! `gaffer test -- <cmd>` — spawn child process, parse artifacts, store, analyze, sync.
 
+use std::path::PathBuf;
 use std::process::Command;
 
 use anyhow::{Context, Result};
 use gaffer_core::parsers;
-use gaffer_core::types::{CoverageSummary, GafferConfig, RunMetadata, RunSummary, TestEvent};
+use gaffer_core::types::{CoverageSummary, GafferConfig, RunMetadata, RunSummary, TestEvent, status};
 use gaffer_core::GafferCore;
 
 use crate::config::Config;
 use crate::discovery;
 use crate::git;
-use crate::output::summary;
+use crate::output::{json, summary};
+use crate::OutputFormat;
 
 /// Returns true if GAFFER_DEBUG=1 (or any truthy value) is set.
 fn is_debug() -> bool {
@@ -27,7 +29,7 @@ macro_rules! debug_timing {
 }
 
 /// Run the test command: spawn child, parse reports, store, analyze, print, sync.
-pub fn run(config: &Config, command: &[String], explicit_reports: &[String]) -> Result<i32> {
+pub fn run(config: &Config, command: &[String], explicit_reports: &[String], format: &OutputFormat, show_errors: bool, compare: Option<&str>) -> Result<i32> {
     // 1. Detect git metadata
     let branch = git::detect_branch();
     let commit = git::detect_commit();
@@ -51,10 +53,12 @@ pub fn run(config: &Config, command: &[String], explicit_reports: &[String]) -> 
         })
         .context("Failed to start run")?;
 
-    // 4. Spawn child process (inherit stdout/stderr)
+    // 4. Spawn child process
+    // In JSON mode, redirect child stdout to stderr so only gaffer's JSON goes to stdout.
+    let json_mode = matches!(format, OutputFormat::Json);
     let run_start = std::time::SystemTime::now();
     let start = std::time::Instant::now();
-    let exit_code = spawn_child(command)?;
+    let exit_code = spawn_child(command, json_mode)?;
     let duration_ms = start.elapsed().as_millis() as f64;
 
     // 5. Discover report files (only files written during this run)
@@ -145,13 +149,19 @@ pub fn run(config: &Config, command: &[String], explicit_reports: &[String]) -> 
         debug_timing!("[gaffer] Coverage: {:.1}ms", cov_start.elapsed().as_secs_f64() * 1000.0);
     }
 
-    // 10. Build summary and finalize
-    let passed = all_tests.iter().filter(|t| t.status == "passed").count() as i32;
-    let failed = all_tests.iter().filter(|t| t.status == "failed").count() as i32;
-    let skipped = all_tests
-        .iter()
-        .filter(|t| t.status != "passed" && t.status != "failed")
-        .count() as i32;
+    // 10. Collect failures (always needed for JSON; used by --show-errors for human output)
+    let failures: Vec<&TestEvent> = all_tests.iter().filter(|t| t.status == status::FAILED).collect();
+
+    let context_files: Vec<PathBuf> = if show_errors && !failures.is_empty() {
+        discovery::discover_context_files(&config.project_root, run_start, &report_files)
+    } else {
+        Vec::new()
+    };
+
+    // 11. Build summary and finalize
+    let passed = all_tests.iter().filter(|t| t.status == status::PASSED).count() as i32;
+    let failed = failures.len() as i32;
+    let skipped = all_tests.len() as i32 - passed - failed;
     let run_summary = RunSummary {
         total: all_tests.len() as i32,
         passed,
@@ -174,9 +184,41 @@ pub fn run(config: &Config, command: &[String], explicit_reports: &[String]) -> 
         }
     };
 
+    // 13. Compare against baseline branch if --compare is set.
+    // Comparison is non-critical — the user's test results, sync, and exit code are all
+    // independent. All error paths degrade to a warning + skip so the run completes normally.
+    let comparison = if let Some(baseline_branch) = compare {
+        match core.compare_run(&run_id, &run_summary, baseline_branch) {
+            Ok(Some(result)) => Some(result),
+            Ok(None) => {
+                eprintln!(
+                    "[gaffer] Warning: no runs found on '{}'. Run tests on that branch first.",
+                    baseline_branch
+                );
+                None
+            }
+            Err(e) => {
+                eprintln!("[gaffer] Warning: comparison failed: {}", e);
+                None
+            }
+        }
+    } else {
+        None
+    };
+
     debug_timing!("[gaffer] Total post-test: {:.1}ms", post_test_start.elapsed().as_secs_f64() * 1000.0);
 
-    summary::print_report(&report, coverage_summary.as_ref(), sync_result.as_ref());
+    match format {
+        OutputFormat::Human => {
+            let error_failures = if show_errors { &failures[..] } else { &[] };
+            summary::print_report(&report, error_failures, &context_files, coverage_summary.as_ref(), sync_result.as_ref(), comparison.as_ref());
+        }
+        OutputFormat::Json => {
+            if let Err(e) = json::print_json(&report, &failures, &context_files, coverage_summary.as_ref(), sync_result.as_ref(), comparison.as_ref()) {
+                eprintln!("[gaffer] Error: failed to serialize JSON output: {}", e);
+            }
+        }
+    }
 
     if report_files.is_empty() {
         eprintln!(
@@ -189,18 +231,26 @@ pub fn run(config: &Config, command: &[String], explicit_reports: &[String]) -> 
         );
     }
 
-    // 11. Exit with child process exit code
+    // 12. Exit with child process exit code
     Ok(exit_code)
 }
 
-/// Spawn a child process, inheriting stdout/stderr.
-fn spawn_child(command: &[String]) -> Result<i32> {
+/// Spawn a child process. When `redirect_stdout` is true, the child's stdout
+/// is sent to stderr so that only gaffer's JSON output occupies stdout.
+fn spawn_child(command: &[String], redirect_stdout: bool) -> Result<i32> {
     if command.is_empty() {
         anyhow::bail!("No command provided. Usage: gaffer test -- <command>");
     }
 
-    let status = Command::new(&command[0])
-        .args(&command[1..])
+    let mut cmd = Command::new(&command[0]);
+    cmd.args(&command[1..]);
+
+    if redirect_stdout {
+        cmd.stdout(std::process::Stdio::from(std::io::stderr()));
+        debug_timing!("[gaffer] JSON mode: child stdout redirected to stderr");
+    }
+
+    let status = cmd
         .status()
         .context(format!("Failed to spawn '{}'", command[0]))?;
 

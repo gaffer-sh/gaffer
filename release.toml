@@ -1,0 +1,7 @@
+[workspace]
+sign-tag = false
+push-remote = "origin"
+tag-prefix = "cli-"
+
+# Not publishing to crates.io
+publish = false

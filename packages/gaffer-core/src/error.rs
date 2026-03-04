@@ -4,6 +4,8 @@ pub enum GafferError {
     Database(#[from] rusqlite::Error),
     #[error("Parse error: {0}")]
     Parse(String),
+    #[error("{0}")]
+    NotFound(String),
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 }

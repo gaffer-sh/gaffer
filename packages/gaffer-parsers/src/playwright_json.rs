@@ -168,10 +168,7 @@ fn map_status(status: &str, last_result: Option<&PlaywrightTestResult>) -> TestS
         "flaky" => TestStatus::Flaky,
         // Unknown statuses default to Skipped for forward-compatibility.
         // Known Playwright statuses: expected, unexpected, skipped, flaky.
-        other => {
-            eprintln!("Warning: Unknown Playwright test status '{}', treating as skipped", other);
-            TestStatus::Skipped
-        }
+        _ => TestStatus::Skipped,
     }
 }
 

@@ -27,12 +27,18 @@ pub use types::{
     ParseError, ParseResult, ParsedReport, ResultType, Summary, TestCase, TestStatus,
 };
 
+use std::sync::OnceLock;
 use wasm_bindgen::prelude::*;
+
+static REGISTRY: OnceLock<ParserRegistry> = OnceLock::new();
+
+fn get_registry() -> &'static ParserRegistry {
+    REGISTRY.get_or_init(ParserRegistry::with_defaults)
+}
 
 #[wasm_bindgen]
 pub fn detect_format(content: &str, filename: &str) -> Result<String, String> {
-    let registry = ParserRegistry::with_defaults();
-    match registry.detect(content, filename) {
+    match get_registry().detect(content, filename) {
         Some(detection) => serde_json::to_string(&detection)
             .map_err(|e| format!("JSON serialization failed: {}", e)),
         None => Ok("null".to_string()),
@@ -41,8 +47,7 @@ pub fn detect_format(content: &str, filename: &str) -> Result<String, String> {
 
 #[wasm_bindgen]
 pub fn parse_report(content: &str, filename: &str) -> Result<String, String> {
-    let registry = ParserRegistry::with_defaults();
-    match registry.parse(content, filename) {
+    match get_registry().parse(content, filename) {
         Some(Ok(ParseResult::Coverage(report))) => Err(format!(
             "File detected as coverage format ({}), not a test report. Use parse_coverage() instead.",
             report.format
@@ -56,8 +61,7 @@ pub fn parse_report(content: &str, filename: &str) -> Result<String, String> {
 
 #[wasm_bindgen]
 pub fn parse_coverage(content: &str, filename: &str) -> Result<String, String> {
-    let registry = ParserRegistry::with_defaults();
-    match registry.parse(content, filename) {
+    match get_registry().parse(content, filename) {
         Some(Ok(ParseResult::Coverage(report))) => serde_json::to_string(&report)
             .map_err(|e| format!("JSON serialization failed: {}", e)),
         Some(Ok(_)) => Err("Not a coverage format".to_string()),

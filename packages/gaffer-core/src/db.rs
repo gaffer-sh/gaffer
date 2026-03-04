@@ -20,7 +20,10 @@
 use rusqlite::{params, Connection};
 use std::path::Path;
 
-use crate::types::{CoverageSummary, PendingUpload, RunMetadata, RunSummary, TestEvent};
+use crate::types::{
+    CoverageSummary, FailureSearchResult, PendingUpload, RecentRun, RunMetadata, RunSummary,
+    TestEvent, TestHistoryEntry,
+};
 
 // Internal types for intelligence queries — these don't cross the NAPI boundary.
 
@@ -45,6 +48,14 @@ pub struct FailedTest {
 
 const MIGRATION_001: &str = include_str!("migrations/001_init.sql");
 const MIGRATION_002: &str = include_str!("migrations/002_coverage_columns.sql");
+
+/// Escape SQL LIKE wildcards (`%`, `_`, `\`) in user input so they are matched literally.
+fn escape_like(input: &str) -> String {
+    input
+        .replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_")
+}
 
 pub struct Database {
     conn: Connection,
@@ -541,6 +552,173 @@ impl Database {
 
         match result {
             Ok(data) => Ok(data),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(e),
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Query subcommand queries — consumed by `gaffer query` via GafferCore
+    // -----------------------------------------------------------------------
+
+    /// List recent finished runs, ordered by most recent first.
+    pub fn get_recent_runs(&self, limit: u32) -> Result<Vec<RecentRun>, rusqlite::Error> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, branch, commit_sha, framework, started_at,
+                    COALESCE(finished_at, started_at),
+                    COALESCE(total, 0), COALESCE(passed, 0), COALESCE(failed, 0),
+                    COALESCE(skipped, 0), COALESCE(duration_ms, 0.0)
+             FROM test_runs WHERE status = 'finished'
+             ORDER BY started_at DESC LIMIT ?1",
+        )?;
+
+        let rows = stmt.query_map(params![limit], |row| {
+            Ok(RecentRun {
+                id: row.get(0)?,
+                branch: row.get(1)?,
+                commit_sha: row.get(2)?,
+                framework: row.get(3)?,
+                started_at: row.get(4)?,
+                finished_at: row.get(5)?,
+                total: row.get(6)?,
+                passed: row.get(7)?,
+                failed: row.get(8)?,
+                skipped: row.get(9)?,
+                duration_ms: row.get(10)?,
+            })
+        })?;
+
+        rows.collect()
+    }
+
+    /// Get pass/fail history for a specific test (name matched with LIKE).
+    pub fn get_test_history(
+        &self,
+        test_pattern: &str,
+        limit: u32,
+    ) -> Result<Vec<TestHistoryEntry>, rusqlite::Error> {
+        let mut stmt = self.conn.prepare(
+            "SELECT te.name, te.status, te.duration_ms, te.error_message,
+                    tr.branch, tr.commit_sha, tr.started_at
+             FROM test_executions te
+             JOIN test_runs tr ON te.run_id = tr.id
+             WHERE tr.status = 'finished' AND te.name LIKE ?1 ESCAPE '\\'
+             ORDER BY tr.started_at DESC LIMIT ?2",
+        )?;
+
+        let like_pattern = format!("%{}%", escape_like(test_pattern));
+        let rows = stmt.query_map(params![like_pattern, limit], |row| {
+            Ok(TestHistoryEntry {
+                name: row.get(0)?,
+                status: row.get(1)?,
+                duration_ms: row.get(2)?,
+                error_message: row.get(3)?,
+                branch: row.get(4)?,
+                commit_sha: row.get(5)?,
+                started_at: row.get(6)?,
+            })
+        })?;
+
+        rows.collect()
+    }
+
+    /// Search failures across runs by name or error message pattern.
+    pub fn search_failures(
+        &self,
+        pattern: &str,
+        limit: u32,
+    ) -> Result<Vec<FailureSearchResult>, rusqlite::Error> {
+        let mut stmt = self.conn.prepare(
+            "SELECT te.name, te.file_path, te.error_message, te.duration_ms,
+                    tr.branch, tr.commit_sha, tr.started_at
+             FROM test_executions te
+             JOIN test_runs tr ON te.run_id = tr.id
+             WHERE tr.status = 'finished' AND te.status = 'failed'
+               AND (te.name LIKE ?1 ESCAPE '\\' OR te.error_message LIKE ?1 ESCAPE '\\')
+             ORDER BY tr.started_at DESC LIMIT ?2",
+        )?;
+
+        let like_pattern = format!("%{}%", escape_like(pattern));
+        let rows = stmt.query_map(params![like_pattern, limit], |row| {
+            Ok(FailureSearchResult {
+                name: row.get(0)?,
+                file_path: row.get(1)?,
+                error_message: row.get(2)?,
+                duration_ms: row.get(3)?,
+                branch: row.get(4)?,
+                commit_sha: row.get(5)?,
+                started_at: row.get(6)?,
+            })
+        })?;
+
+        rows.collect()
+    }
+
+    // -----------------------------------------------------------------------
+    // Comparison queries — consumed by compare_run() in lib.rs
+    // -----------------------------------------------------------------------
+
+    /// Get the most recent finished run on a specific branch.
+    /// Excludes `exclude_run_id` to handle same-branch comparison
+    /// where the current run would otherwise be its own baseline.
+    pub fn get_latest_run_for_branch(
+        &self,
+        branch: &str,
+        exclude_run_id: &str,
+    ) -> Result<Option<(String, RunSummary)>, rusqlite::Error> {
+        let result = self.conn.query_row(
+            "SELECT id, total, passed, failed, skipped, COALESCE(duration_ms, 0.0)
+             FROM test_runs
+             WHERE status = 'finished' AND branch = ?1 AND id != ?2
+               AND total IS NOT NULL
+             ORDER BY started_at DESC LIMIT 1",
+            params![branch, exclude_run_id],
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    RunSummary {
+                        total: row.get(1)?,
+                        passed: row.get(2)?,
+                        failed: row.get(3)?,
+                        skipped: row.get(4)?,
+                        duration: row.get(5)?,
+                    },
+                ))
+            },
+        );
+        match result {
+            Ok(tuple) => Ok(Some(tuple)),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(e),
+        }
+    }
+
+    /// Get (name, status) pairs for a run — lightweight, for comparison only.
+    pub fn get_test_statuses_for_run(
+        &self,
+        run_id: &str,
+    ) -> Result<Vec<(String, String)>, rusqlite::Error> {
+        let mut stmt = self.conn.prepare(
+            "SELECT name, status FROM test_executions WHERE run_id = ?1 ORDER BY id ASC",
+        )?;
+        let rows = stmt.query_map(params![run_id], |row| {
+            Ok((row.get(0)?, row.get(1)?))
+        })?;
+        rows.collect()
+    }
+
+    /// Get the latest finished run's summary counts for health score computation.
+    /// Returns (run_id, total, passed) or None if no finished runs exist.
+    pub fn get_latest_run_summary(&self) -> Result<Option<(String, i32, i32)>, rusqlite::Error> {
+        let result = self.conn.query_row(
+            "SELECT id, COALESCE(total, 0), COALESCE(passed, 0)
+             FROM test_runs WHERE status = 'finished'
+             ORDER BY started_at DESC LIMIT 1",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        );
+        match result {
+            Ok(tuple) => Ok(Some(tuple)),
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
             Err(e) => Err(e),
         }
@@ -1309,5 +1487,338 @@ mod tests {
 
         let result = db.get_coverage_for_run("run-1").unwrap();
         assert!(result.is_none());
+    }
+
+    // -----------------------------------------------------------------------
+    // Query subcommand DB methods
+    // -----------------------------------------------------------------------
+
+    /// Helper: create a finished run with given counts.
+    fn insert_finished_run(
+        db: &Database,
+        run_id: &str,
+        started_at: &str,
+        total: i32,
+        passed: i32,
+        failed: i32,
+    ) {
+        let metadata = RunMetadata {
+            branch: Some("main".to_string()),
+            commit: Some("abc123".to_string()),
+            ci_provider: None,
+            framework: "vitest".to_string(),
+        };
+        db.insert_run(run_id, &metadata, started_at).unwrap();
+        let summary = RunSummary {
+            total,
+            passed,
+            failed,
+            skipped: total - passed - failed,
+            duration: 1000.0,
+        };
+        let finished_at = format!("{}1", started_at); // slightly after
+        db.finish_run(run_id, &summary, &finished_at).unwrap();
+    }
+
+    #[test]
+    fn get_recent_runs_returns_finished_runs_newest_first() {
+        let (db, _dir) = test_db();
+        insert_finished_run(&db, "run-1", "2026-01-01T10:00:00Z", 10, 9, 1);
+        insert_finished_run(&db, "run-2", "2026-01-02T10:00:00Z", 20, 18, 2);
+        insert_finished_run(&db, "run-3", "2026-01-03T10:00:00Z", 5, 5, 0);
+
+        let runs = db.get_recent_runs(10).unwrap();
+        assert_eq!(runs.len(), 3);
+        assert_eq!(runs[0].id, "run-3"); // newest first
+        assert_eq!(runs[1].id, "run-2");
+        assert_eq!(runs[2].id, "run-1");
+        assert_eq!(runs[0].total, 5);
+        assert_eq!(runs[0].passed, 5);
+        assert_eq!(runs[0].failed, 0);
+    }
+
+    #[test]
+    fn get_recent_runs_respects_limit() {
+        let (db, _dir) = test_db();
+        insert_finished_run(&db, "run-1", "2026-01-01T10:00:00Z", 10, 10, 0);
+        insert_finished_run(&db, "run-2", "2026-01-02T10:00:00Z", 10, 10, 0);
+        insert_finished_run(&db, "run-3", "2026-01-03T10:00:00Z", 10, 10, 0);
+
+        let runs = db.get_recent_runs(2).unwrap();
+        assert_eq!(runs.len(), 2);
+    }
+
+    #[test]
+    fn get_recent_runs_excludes_running() {
+        let (db, _dir) = test_db();
+        insert_finished_run(&db, "run-1", "2026-01-01T10:00:00Z", 10, 10, 0);
+        // Insert a running (not finished) run
+        db.insert_run("run-2", &sample_metadata(), "2026-01-02T10:00:00Z")
+            .unwrap();
+
+        let runs = db.get_recent_runs(10).unwrap();
+        assert_eq!(runs.len(), 1);
+        assert_eq!(runs[0].id, "run-1");
+    }
+
+    #[test]
+    fn get_recent_runs_empty_db() {
+        let (db, _dir) = test_db();
+        let runs = db.get_recent_runs(10).unwrap();
+        assert!(runs.is_empty());
+    }
+
+    #[test]
+    fn get_test_history_matches_by_name() {
+        let (db, _dir) = test_db();
+        insert_finished_run(&db, "run-1", "2026-01-01T10:00:00Z", 2, 2, 0);
+        db.insert_test("run-1", &sample_test("auth > login", status::PASSED, 100.0))
+            .unwrap();
+        db.insert_test("run-1", &sample_test("auth > logout", status::PASSED, 50.0))
+            .unwrap();
+
+        insert_finished_run(&db, "run-2", "2026-01-02T10:00:00Z", 2, 1, 1);
+        let mut failed_test = sample_test("auth > login", status::FAILED, 200.0);
+        failed_test.error = Some("timeout".to_string());
+        db.insert_test("run-2", &failed_test).unwrap();
+        db.insert_test("run-2", &sample_test("auth > logout", status::PASSED, 50.0))
+            .unwrap();
+
+        // Search for "login" — should get 2 entries
+        let history = db.get_test_history("login", 50).unwrap();
+        assert_eq!(history.len(), 2);
+        assert_eq!(history[0].status, "failed"); // newest first
+        assert_eq!(history[0].error_message, Some("timeout".to_string()));
+        assert_eq!(history[1].status, "passed");
+    }
+
+    #[test]
+    fn get_test_history_no_matches() {
+        let (db, _dir) = test_db();
+        insert_finished_run(&db, "run-1", "2026-01-01T10:00:00Z", 1, 1, 0);
+        db.insert_test("run-1", &sample_test("test_a", status::PASSED, 100.0))
+            .unwrap();
+
+        let history = db.get_test_history("nonexistent", 50).unwrap();
+        assert!(history.is_empty());
+    }
+
+    #[test]
+    fn search_failures_matches_name_and_error() {
+        let (db, _dir) = test_db();
+        insert_finished_run(&db, "run-1", "2026-01-01T10:00:00Z", 3, 1, 2);
+
+        let mut test1 = sample_test("auth > login", status::FAILED, 100.0);
+        test1.error = Some("connection refused".to_string());
+        db.insert_test("run-1", &test1).unwrap();
+
+        let mut test2 = sample_test("api > fetch_users", status::FAILED, 200.0);
+        test2.error = Some("timeout error".to_string());
+        db.insert_test("run-1", &test2).unwrap();
+
+        db.insert_test("run-1", &sample_test("test_ok", status::PASSED, 50.0))
+            .unwrap();
+
+        // Search by error pattern
+        let results = db.search_failures("connection", 50).unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].name, "auth > login");
+
+        // Search by name pattern
+        let results = db.search_failures("fetch", 50).unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].name, "api > fetch_users");
+    }
+
+    #[test]
+    fn search_failures_excludes_passing_tests() {
+        let (db, _dir) = test_db();
+        insert_finished_run(&db, "run-1", "2026-01-01T10:00:00Z", 1, 1, 0);
+        db.insert_test("run-1", &sample_test("login_test", status::PASSED, 100.0))
+            .unwrap();
+
+        let results = db.search_failures("login", 50).unwrap();
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn search_failures_empty_db() {
+        let (db, _dir) = test_db();
+        let results = db.search_failures("anything", 50).unwrap();
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn search_failures_matches_name_when_error_is_null() {
+        let (db, _dir) = test_db();
+        insert_finished_run(&db, "run-1", "2026-01-01T10:00:00Z", 1, 0, 1);
+        // Insert a failed test with no error message
+        let mut t = sample_test("auth > login", status::FAILED, 100.0);
+        t.error = None;
+        db.insert_test("run-1", &t).unwrap();
+
+        let results = db.search_failures("login", 50).unwrap();
+        assert_eq!(results.len(), 1);
+        assert!(results[0].error_message.is_none());
+    }
+
+    #[test]
+    fn search_failures_underscore_is_literal() {
+        let (db, _dir) = test_db();
+        insert_finished_run(&db, "run-1", "2026-01-01T10:00:00Z", 2, 0, 2);
+        let mut t1 = sample_test("test_a", status::FAILED, 100.0);
+        t1.error = Some("err".to_string());
+        db.insert_test("run-1", &t1).unwrap();
+        let mut t2 = sample_test("testXa", status::FAILED, 100.0);
+        t2.error = Some("err".to_string());
+        db.insert_test("run-1", &t2).unwrap();
+
+        // "test_a" with literal underscore should NOT match "testXa"
+        let results = db.search_failures("test_a", 50).unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].name, "test_a");
+    }
+
+    #[test]
+    fn get_test_history_underscore_is_literal() {
+        let (db, _dir) = test_db();
+        insert_finished_run(&db, "run-1", "2026-01-01T10:00:00Z", 2, 2, 0);
+        db.insert_test("run-1", &sample_test("test_a", status::PASSED, 100.0))
+            .unwrap();
+        db.insert_test("run-1", &sample_test("testXa", status::PASSED, 100.0))
+            .unwrap();
+
+        // "test_a" with literal underscore should NOT match "testXa"
+        let history = db.get_test_history("test_a", 50).unwrap();
+        assert_eq!(history.len(), 1);
+        assert_eq!(history[0].name, "test_a");
+    }
+
+    #[test]
+    fn get_latest_run_summary_returns_most_recent() {
+        let (db, _dir) = test_db();
+        insert_finished_run(&db, "run-1", "2026-01-01T10:00:00Z", 10, 8, 2);
+        insert_finished_run(&db, "run-2", "2026-01-02T10:00:00Z", 20, 19, 1);
+
+        let (id, total, passed) = db.get_latest_run_summary().unwrap().unwrap();
+        assert_eq!(id, "run-2");
+        assert_eq!(total, 20);
+        assert_eq!(passed, 19);
+    }
+
+    #[test]
+    fn get_latest_run_summary_empty_db() {
+        let (db, _dir) = test_db();
+        assert!(db.get_latest_run_summary().unwrap().is_none());
+    }
+
+    // -----------------------------------------------------------------------
+    // Comparison DB methods
+    // -----------------------------------------------------------------------
+
+    /// Helper: create a finished run on a specific branch.
+    fn insert_finished_run_on_branch(
+        db: &Database,
+        run_id: &str,
+        branch: &str,
+        started_at: &str,
+        total: i32,
+        passed: i32,
+        failed: i32,
+    ) {
+        let metadata = RunMetadata {
+            branch: Some(branch.to_string()),
+            commit: Some("abc123".to_string()),
+            ci_provider: None,
+            framework: "vitest".to_string(),
+        };
+        db.insert_run(run_id, &metadata, started_at).unwrap();
+        let summary = RunSummary {
+            total,
+            passed,
+            failed,
+            skipped: total - passed - failed,
+            duration: 1000.0,
+        };
+        let finished_at = format!("{}1", started_at);
+        db.finish_run(run_id, &summary, &finished_at).unwrap();
+    }
+
+    #[test]
+    fn get_latest_run_for_branch_returns_most_recent() {
+        let (db, _dir) = test_db();
+        insert_finished_run_on_branch(&db, "run-1", "main", "2026-01-01T10:00:00Z", 10, 9, 1);
+        insert_finished_run_on_branch(&db, "run-2", "main", "2026-01-02T10:00:00Z", 20, 18, 2);
+        insert_finished_run_on_branch(&db, "run-3", "feat", "2026-01-03T10:00:00Z", 5, 5, 0);
+
+        let result = db.get_latest_run_for_branch("main", "exclude-none").unwrap();
+        assert!(result.is_some());
+        let (id, summary) = result.unwrap();
+        assert_eq!(id, "run-2");
+        assert_eq!(summary.total, 20);
+        assert_eq!(summary.passed, 18);
+        assert_eq!(summary.failed, 2);
+    }
+
+    #[test]
+    fn get_latest_run_for_branch_returns_none_for_unknown_branch() {
+        let (db, _dir) = test_db();
+        insert_finished_run_on_branch(&db, "run-1", "main", "2026-01-01T10:00:00Z", 10, 10, 0);
+
+        let result = db.get_latest_run_for_branch("nonexistent", "exclude-none").unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn get_latest_run_for_branch_excludes_running_runs() {
+        let (db, _dir) = test_db();
+        // Insert a running (not finished) run on main
+        let metadata = RunMetadata {
+            branch: Some("main".to_string()),
+            commit: None,
+            ci_provider: None,
+            framework: "vitest".to_string(),
+        };
+        db.insert_run("run-1", &metadata, "2026-01-01T10:00:00Z").unwrap();
+
+        let result = db.get_latest_run_for_branch("main", "exclude-none").unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn get_latest_run_for_branch_excludes_specified_run() {
+        let (db, _dir) = test_db();
+        insert_finished_run_on_branch(&db, "run-1", "main", "2026-01-01T10:00:00Z", 10, 9, 1);
+        insert_finished_run_on_branch(&db, "run-2", "main", "2026-01-02T10:00:00Z", 20, 18, 2);
+
+        // Exclude run-2 — should fall back to run-1
+        let result = db.get_latest_run_for_branch("main", "run-2").unwrap();
+        assert!(result.is_some());
+        let (id, _) = result.unwrap();
+        assert_eq!(id, "run-1");
+    }
+
+    #[test]
+    fn get_test_statuses_for_run_returns_all_statuses() {
+        let (db, _dir) = test_db();
+        db.insert_run("run-1", &sample_metadata(), "2026-01-01T10:00:00Z").unwrap();
+        db.insert_test("run-1", &sample_test("test_a", status::PASSED, 100.0)).unwrap();
+        db.insert_test("run-1", &sample_test("test_b", status::FAILED, 200.0)).unwrap();
+        db.insert_test("run-1", &sample_test("test_c", status::SKIPPED, 0.0)).unwrap();
+
+        let statuses = db.get_test_statuses_for_run("run-1").unwrap();
+        assert_eq!(statuses.len(), 3);
+
+        let map: std::collections::HashMap<_, _> = statuses.into_iter().collect();
+        assert_eq!(map["test_a"], "passed");
+        assert_eq!(map["test_b"], "failed");
+        assert_eq!(map["test_c"], "skipped");
+    }
+
+    #[test]
+    fn get_test_statuses_for_run_empty_for_unknown() {
+        let (db, _dir) = test_db();
+        let statuses = db.get_test_statuses_for_run("nonexistent").unwrap();
+        assert!(statuses.is_empty());
     }
 }

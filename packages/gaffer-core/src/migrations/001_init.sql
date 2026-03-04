@@ -52,6 +52,7 @@ CREATE TABLE IF NOT EXISTS test_executions (
 CREATE INDEX IF NOT EXISTS idx_test_executions_run_id ON test_executions(run_id);
 CREATE INDEX IF NOT EXISTS idx_test_executions_name ON test_executions(name);
 CREATE INDEX IF NOT EXISTS idx_test_runs_started_at ON test_runs(started_at);
+CREATE INDEX IF NOT EXISTS idx_test_runs_branch ON test_runs(branch);
 
 CREATE TABLE IF NOT EXISTS coverage_reports (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

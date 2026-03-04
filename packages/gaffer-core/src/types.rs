@@ -133,6 +133,76 @@ pub struct HealthScore {
 }
 
 // =============================================================================
+// Query types — returned by `gaffer query` subcommands
+// =============================================================================
+
+/// A recent test run summary, returned by `gaffer query runs`.
+/// Only includes finished runs (status = 'finished'), so `finished_at` is always present.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecentRun {
+    pub id: String,
+    pub branch: Option<String>,
+    pub commit_sha: Option<String>,
+    pub framework: String,
+    pub started_at: String,
+    pub finished_at: String,
+    pub total: i32,
+    pub passed: i32,
+    pub failed: i32,
+    pub skipped: i32,
+    pub duration_ms: f64,
+}
+
+/// A single test execution in historical context, returned by `gaffer query history`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TestHistoryEntry {
+    pub name: String,
+    /// One of: "passed", "failed", "skipped", "todo" — see `status` module constants
+    pub status: String,
+    pub duration_ms: f64,
+    pub error_message: Option<String>,
+    pub branch: Option<String>,
+    pub commit_sha: Option<String>,
+    pub started_at: String,
+}
+
+/// A failure search result across runs, returned by `gaffer query failures`.
+/// Status is implicitly always "failed" (the query filters by `te.status = 'failed'`).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FailureSearchResult {
+    pub name: String,
+    pub file_path: Option<String>,
+    pub error_message: Option<String>,
+    pub duration_ms: f64,
+    pub branch: Option<String>,
+    pub commit_sha: Option<String>,
+    pub started_at: String,
+}
+
+// =============================================================================
+// Comparison types
+// =============================================================================
+
+/// Result of comparing current run against a baseline branch.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ComparisonResult {
+    pub baseline_branch: String,
+    pub baseline_run_id: String,
+    /// Failed now, passed (or absent) on baseline
+    pub new_failures: Vec<String>,
+    /// Passed now, failed on baseline
+    pub fixed: Vec<String>,
+    /// Failed in both current and baseline
+    pub pre_existing_failures: Vec<String>,
+    /// Change in pass rate (percentage points, current - baseline)
+    pub pass_rate_delta: f64,
+    /// Change in total duration in ms (current - baseline)
+    pub duration_delta: f64,
+    /// Change in total test count (current - baseline)
+    pub total_delta: i32,
+}
+
+// =============================================================================
 // Cloud sync types
 // =============================================================================
 
