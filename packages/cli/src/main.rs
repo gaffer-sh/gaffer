@@ -15,14 +15,21 @@ mod output;
 use std::path::PathBuf;
 use std::process;
 
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 
 use config::Config;
 
-#[derive(Clone, clap::ValueEnum)]
+#[derive(Clone, ValueEnum)]
 pub enum OutputFormat {
     Human,
     Json,
+}
+
+/// What types of failures should cause a non-zero exit code.
+#[derive(Clone, ValueEnum)]
+pub enum FailOn {
+    /// Exit non-zero only for new failures (not pre-existing or flaky)
+    New,
 }
 
 #[derive(Parser)]
@@ -64,6 +71,10 @@ enum Commands {
         #[arg(long)]
         compare: Option<String>,
 
+        /// Override exit code based on failure classification
+        #[arg(long, value_enum)]
+        fail_on: Option<FailOn>,
+
         /// The test command to run (everything after --)
         #[arg(trailing_var_arg = true, required = true)]
         command: Vec<String>,
@@ -89,6 +100,36 @@ enum Commands {
         /// API URL for cloud sync
         #[arg(long, env = "GAFFER_API_URL")]
         api_url: Option<String>,
+    },
+
+    /// Find test files affected by source file changes
+    AffectedTests {
+        /// Source files that changed (can be specified multiple times)
+        #[arg(long = "files", required = true, num_args = 1..)]
+        files: Vec<String>,
+
+        /// Project root directory (default: current directory)
+        #[arg(long, default_value = ".")]
+        root: PathBuf,
+
+        /// Output format: human or json
+        #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
+        format: OutputFormat,
+    },
+
+    /// Diagnose common setup issues
+    Doctor {
+        /// Authentication token (overrides GAFFER_TOKEN and gaffer.toml)
+        #[arg(long, env = "GAFFER_TOKEN")]
+        token: Option<String>,
+
+        /// API URL for cloud sync
+        #[arg(long, env = "GAFFER_API_URL")]
+        api_url: Option<String>,
+
+        /// Project root directory (default: current directory)
+        #[arg(long, default_value = ".")]
+        root: PathBuf,
     },
 
     /// Query local test intelligence (health, flaky tests, durations, history)
@@ -161,6 +202,7 @@ fn main() {
             format,
             show_errors,
             compare,
+            fail_on,
             command,
         } => {
             let project_root = resolve_root(&root);
@@ -170,7 +212,7 @@ fn main() {
                 &reports,
                 &project_root,
             );
-            match commands::test::run(&config, &command, &reports, &format, show_errors, compare.as_deref()) {
+            match commands::test::run(&config, &command, &reports, &format, show_errors, compare.as_deref(), fail_on.as_ref()) {
                 Ok(exit_code) => process::exit(exit_code),
                 Err(e) => {
                     eprintln!("[gaffer] Error: {:#}", e);
@@ -191,6 +233,34 @@ fn main() {
                 &project_root,
             );
             if let Err(e) = commands::sync::run(&config) {
+                eprintln!("[gaffer] Error: {:#}", e);
+                process::exit(1);
+            }
+        }
+        Commands::AffectedTests {
+            files,
+            root,
+            format,
+        } => {
+            let project_root = resolve_root(&root);
+            if let Err(e) = commands::affected_tests::run(&project_root, &files, &format) {
+                eprintln!("[gaffer] Error: {:#}", e);
+                process::exit(1);
+            }
+        }
+        Commands::Doctor {
+            token,
+            api_url,
+            root,
+        } => {
+            let project_root = resolve_root(&root);
+            let config = Config::resolve(
+                token.as_deref(),
+                api_url.as_deref(),
+                &[],
+                &project_root,
+            );
+            if let Err(e) = commands::doctor::run(&config) {
                 eprintln!("[gaffer] Error: {:#}", e);
                 process::exit(1);
             }

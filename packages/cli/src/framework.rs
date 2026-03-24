@@ -19,6 +19,10 @@ pub enum Framework {
     Jest(PathBuf),
     Go,
     Rspec,
+    DotNet(PathBuf),
+    CargoTest,
+    PHPUnit(PathBuf),
+    Mocha(PathBuf),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -47,6 +51,10 @@ impl std::fmt::Display for Framework {
             Framework::Jest(p) => write!(f, "jest ({})", p.file_name().unwrap_or_default().to_string_lossy()),
             Framework::Go => write!(f, "go test"),
             Framework::Rspec => write!(f, "rspec"),
+            Framework::DotNet(p) => write!(f, "dotnet test ({})", p.file_name().unwrap_or_default().to_string_lossy()),
+            Framework::CargoTest => write!(f, "cargo test"),
+            Framework::PHPUnit(p) => write!(f, "phpunit ({})", p.file_name().unwrap_or_default().to_string_lossy()),
+            Framework::Mocha(p) => write!(f, "mocha ({})", p.file_name().unwrap_or_default().to_string_lossy()),
         }
     }
 }
@@ -149,6 +157,57 @@ pub fn detect_frameworks(project_root: &Path) -> Vec<Framework> {
         }
     }
 
+    // .NET — look for *.csproj containing Microsoft.NET.Test.Sdk
+    if let Ok(entries) = std::fs::read_dir(project_root) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().and_then(|e| e.to_str()) == Some("csproj") {
+                if let Ok(content) = std::fs::read_to_string(&path) {
+                    if content.contains("Microsoft.NET.Test.Sdk") {
+                        frameworks.push(Framework::DotNet(path));
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    // Cargo test — Cargo.toml + tests/ directory
+    let cargo_toml = project_root.join("Cargo.toml");
+    let tests_dir = project_root.join("tests");
+    if cargo_toml.exists() && tests_dir.is_dir() {
+        frameworks.push(Framework::CargoTest);
+    }
+
+    // PHPUnit
+    for filename in &["phpunit.xml", "phpunit.xml.dist"] {
+        let path = project_root.join(filename);
+        if path.exists() {
+            frameworks.push(Framework::PHPUnit(path));
+            break;
+        }
+    }
+
+    // Mocha
+    for filename in &[".mocharc.yml", ".mocharc.yaml", ".mocharc.js", ".mocharc.cjs", ".mocharc.json"] {
+        let path = project_root.join(filename);
+        if path.exists() {
+            frameworks.push(Framework::Mocha(path));
+            break;
+        }
+    }
+    // Also check package.json scripts for mocha
+    if !frameworks.iter().any(|f| matches!(f, Framework::Mocha(_))) {
+        let pkg_json = project_root.join("package.json");
+        if pkg_json.exists() {
+            if let Ok(content) = std::fs::read_to_string(&pkg_json) {
+                if content.contains("\"mocha\"") || content.contains("\"mocha ") {
+                    frameworks.push(Framework::Mocha(pkg_json));
+                }
+            }
+        }
+    }
+
     frameworks
 }
 
@@ -162,6 +221,10 @@ pub fn check_reporter(framework: &Framework) -> PatchResult {
         Framework::Jest(config_path) => PatchResult::Instructions(jest_instructions(config_path)),
         Framework::Go => PatchResult::Instructions(go_instructions()),
         Framework::Rspec => PatchResult::Instructions(rspec_instructions()),
+        Framework::DotNet(_) => PatchResult::Instructions(dotnet_instructions()),
+        Framework::CargoTest => PatchResult::Instructions(cargo_test_instructions()),
+        Framework::PHPUnit(config_path) => PatchResult::Instructions(phpunit_instructions(config_path)),
+        Framework::Mocha(_) => PatchResult::Instructions(mocha_instructions()),
     }
 }
 
@@ -336,6 +399,66 @@ fn rspec_instructions() -> String {
          {sp}2. Add to .rspec:\n\
          {sp}{sp}--format CtrfJsonFormatter\n\
          {sp}{sp}--out .gaffer/reports/ctrf-report.json\n",
+        path = GAFFER_JUNIT_PATH,
+        sp = "   ",
+    )
+}
+
+fn dotnet_instructions() -> String {
+    format!(
+        ".NET — use the built-in JUnit logger:\n\n\
+         {sp}dotnet test --logger \"junit;LogFilePath={path}\"\n\n\
+         Or wrap with gaffer:\n\
+         {sp}gaffer test -- dotnet test --logger \"junit;LogFilePath={path}\"\n",
+        path = GAFFER_JUNIT_PATH,
+        sp = "   ",
+    )
+}
+
+fn cargo_test_instructions() -> String {
+    format!(
+        "Cargo test — use cargo2junit or nextest for structured output:\n\n\
+         Option 1 — JUnit via cargo2junit:\n\
+         {sp}1. Install: cargo install cargo2junit\n\
+         {sp}2. Run: cargo test -- -Z unstable-options --format json | cargo2junit > {path}\n\n\
+         Option 2 — nextest (built-in JUnit):\n\
+         {sp}1. Install: cargo install cargo-nextest\n\
+         {sp}2. Run: cargo nextest run --profile ci\n\
+         {sp}   (configure JUnit output in .config/nextest.toml)\n\n\
+         Or wrap with gaffer:\n\
+         {sp}gaffer test -- cargo test\n",
+        path = GAFFER_JUNIT_PATH,
+        sp = "   ",
+    )
+}
+
+fn phpunit_instructions(config_path: &Path) -> String {
+    let filename = config_path.file_name().unwrap_or_default().to_string_lossy();
+    format!(
+        "PHPUnit — add JUnit logging to {filename}:\n\n\
+         {sp}<logging>\n\
+         {sp}  <junit outputFile=\"{path}\"/>\n\
+         {sp}</logging>\n\n\
+         Or via CLI flag:\n\
+         {sp}phpunit --log-junit {path}\n\n\
+         Or wrap with gaffer:\n\
+         {sp}gaffer test -- phpunit --log-junit {path}\n",
+        path = GAFFER_JUNIT_PATH,
+        sp = "   ",
+    )
+}
+
+fn mocha_instructions() -> String {
+    format!(
+        "Mocha — use a reporter package for structured output:\n\n\
+         Option 1 — JUnit:\n\
+         {sp}1. Install: npm install -D mocha-junit-reporter\n\
+         {sp}2. Run: mocha --reporter mocha-junit-reporter --reporter-options mochaFile={path}\n\n\
+         Option 2 — CTRF:\n\
+         {sp}1. Install: npm install -D mocha-ctrf-json-reporter\n\
+         {sp}2. Run: mocha --reporter mocha-ctrf-json-reporter\n\n\
+         Or wrap with gaffer:\n\
+         {sp}gaffer test -- mocha --reporter mocha-junit-reporter --reporter-options mochaFile={path}\n",
         path = GAFFER_JUNIT_PATH,
         sp = "   ",
     )

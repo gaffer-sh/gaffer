@@ -3,8 +3,8 @@
 use std::path::PathBuf;
 
 use gaffer_core::types::{
-    ComparisonResult, CoverageSummary, HealthScore, RunReport, SyncResult, TestEvent,
-    TestIntelligence,
+    ClassificationResult, ComparisonResult, CoverageSummary, FailureClassification,
+    HealthScore, RunReport, SyncResult, TestEvent, TestIntelligence,
 };
 use serde::Serialize;
 
@@ -24,6 +24,25 @@ pub struct JsonOutput<'a> {
     pub comparison: Option<&'a ComparisonResult>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub context_files: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub classification: Option<ClassificationOutput>,
+}
+
+#[derive(Serialize)]
+pub struct ClassificationOutput {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub baseline_branch: Option<String>,
+    pub classified_failures: Vec<ClassifiedFailureEntry>,
+}
+
+#[derive(Serialize)]
+pub struct ClassifiedFailureEntry {
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file: Option<String>,
+    pub classification: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub flip_rate: Option<f64>,
 }
 
 #[derive(Serialize)]
@@ -45,6 +64,7 @@ pub fn print_json(
     coverage: Option<&CoverageSummary>,
     sync_result: Option<&SyncResult>,
     comparison: Option<&ComparisonResult>,
+    classification: &ClassificationResult,
 ) -> Result<(), serde_json::Error> {
     let failure_entries: Vec<FailureEntry> = failures
         .iter()
@@ -61,6 +81,28 @@ pub fn print_json(
         .map(|p| p.display().to_string())
         .collect();
 
+    let classification_output = if classification.classified_failures.is_empty() {
+        None
+    } else {
+        Some(ClassificationOutput {
+            baseline_branch: classification.baseline_branch.clone(),
+            classified_failures: classification
+                .classified_failures
+                .iter()
+                .map(|f| ClassifiedFailureEntry {
+                    name: f.name.clone(),
+                    file: f.file_path.clone(),
+                    classification: f.classification.to_string(),
+                    flip_rate: if f.classification == FailureClassification::Flaky {
+                        f.flip_rate
+                    } else {
+                        None
+                    },
+                })
+                .collect(),
+        })
+    };
+
     let output = JsonOutput {
         summary: &report.summary,
         failures: failure_entries,
@@ -70,6 +112,7 @@ pub fn print_json(
         sync: sync_result,
         comparison,
         context_files: context_strings,
+        classification: classification_output,
     };
 
     let json = serde_json::to_string(&output)?;

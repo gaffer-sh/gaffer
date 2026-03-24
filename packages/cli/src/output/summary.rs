@@ -4,7 +4,8 @@ use std::path::PathBuf;
 
 use colored::Colorize;
 use gaffer_core::types::{
-    ComparisonResult, CoverageSummary, DurationAnalysis, FailureSearchResult, FlakyTestResult,
+    ClassificationResult, ComparisonResult, CoverageDelta, CoverageSummary,
+    DurationAnalysis, FailureClassification, FailureSearchResult, FlakyTestResult,
     HealthScore, RecentRun, RunReport, SyncResult, TestEvent, TestHistoryEntry, TestIntelligence,
     status,
 };
@@ -360,12 +361,100 @@ pub fn print_comparison(comparison: &ComparisonResult) {
 
     eprintln!("{}", parts.concat());
 
+    // Coverage delta
+    if let Some(cov) = &comparison.coverage_delta {
+        print_coverage_delta(cov);
+    }
+
     // Detail lines
     for name in &comparison.new_failures {
         eprintln!("   {}  {}", "NEW".red().bold(), name);
     }
     for name in &comparison.fixed {
         eprintln!("   {}  {}", "FIX".green().bold(), name);
+    }
+}
+
+/// Print coverage delta from comparison.
+pub fn print_coverage_delta(delta: &CoverageDelta) {
+    let format_delta = |val: f64, label: &str| -> String {
+        if val.abs() < 0.05 {
+            return String::new();
+        }
+        let sign = if val > 0.0 { "+" } else { "" };
+        format!("{}{:.1}% {}", sign, val, label)
+    };
+
+    let parts: Vec<String> = [
+        format_delta(delta.lines_delta, "lines"),
+        format_delta(delta.branches_delta, "branches"),
+        format_delta(delta.functions_delta, "functions"),
+    ]
+    .into_iter()
+    .filter(|s| !s.is_empty())
+    .collect();
+
+    if !parts.is_empty() {
+        let detail = parts.join(", ");
+        let colored = if delta.lines_delta >= 0.0 {
+            format!("  coverage: {}", detail).green().to_string()
+        } else {
+            format!("  coverage: {}", detail).red().to_string()
+        };
+        eprintln!("{}", colored);
+    }
+}
+
+/// Print classified failures grouped by classification type.
+pub fn print_classification(classification: &ClassificationResult) {
+    if classification.classified_failures.is_empty() {
+        return;
+    }
+
+    let new: Vec<_> = classification.classified_failures.iter()
+        .filter(|f| f.classification == FailureClassification::New)
+        .collect();
+    let pre_existing: Vec<_> = classification.classified_failures.iter()
+        .filter(|f| f.classification == FailureClassification::PreExisting)
+        .collect();
+    let flaky: Vec<_> = classification.classified_failures.iter()
+        .filter(|f| f.classification == FailureClassification::Flaky)
+        .collect();
+    let unknown: Vec<_> = classification.classified_failures.iter()
+        .filter(|f| f.classification == FailureClassification::Unknown)
+        .collect();
+
+    if !new.is_empty() {
+        eprintln!("{}", format!("New failures: {}", new.len()).red().bold());
+        for f in &new {
+            let file = f.file_path.as_deref().unwrap_or("-");
+            eprintln!("   {} > {}", file, f.name);
+        }
+    }
+
+    if !pre_existing.is_empty() {
+        eprintln!("{}", format!("Pre-existing: {}", pre_existing.len()).dimmed());
+        for f in &pre_existing {
+            let file = f.file_path.as_deref().unwrap_or("-");
+            eprintln!("   {} > {}", file, f.name);
+        }
+    }
+
+    if !flaky.is_empty() {
+        eprintln!("{}", format!("Flaky: {}", flaky.len()).yellow());
+        for f in &flaky {
+            let file = f.file_path.as_deref().unwrap_or("-");
+            let rate = f.flip_rate.map(|r| format!("  ({}% flip rate)", (r * 100.0).round() as u32)).unwrap_or_default();
+            eprintln!("   {} > {}{}", file, f.name, rate);
+        }
+    }
+
+    if !unknown.is_empty() {
+        eprintln!("{}", format!("Unclassified: {}", unknown.len()).dimmed());
+        for f in &unknown {
+            let file = f.file_path.as_deref().unwrap_or("-");
+            eprintln!("   {} > {}", file, f.name);
+        }
     }
 }
 
@@ -420,7 +509,7 @@ pub fn print_context(context_files: &[PathBuf]) {
 }
 
 /// Print the full enriched report.
-pub fn print_report(report: &RunReport, failures: &[&TestEvent], context_files: &[PathBuf], coverage: Option<&CoverageSummary>, sync_result: Option<&SyncResult>, comparison: Option<&ComparisonResult>) {
+pub fn print_report(report: &RunReport, failures: &[&TestEvent], context_files: &[PathBuf], coverage: Option<&CoverageSummary>, sync_result: Option<&SyncResult>, comparison: Option<&ComparisonResult>, classification: &ClassificationResult) {
     let duration_secs = report.summary.duration / 1000.0;
     print_summary(
         report.summary.passed,
@@ -440,6 +529,10 @@ pub fn print_report(report: &RunReport, failures: &[&TestEvent], context_files: 
 
     if let Some(cmp) = comparison {
         print_comparison(cmp);
+    }
+
+    if !classification.classified_failures.is_empty() {
+        print_classification(classification);
     }
 
     print_errors(failures);

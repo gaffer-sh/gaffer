@@ -200,6 +200,98 @@ pub struct ComparisonResult {
     pub duration_delta: f64,
     /// Change in total test count (current - baseline)
     pub total_delta: i32,
+    /// Coverage delta (if both runs have coverage data)
+    pub coverage_delta: Option<CoverageDelta>,
+}
+
+// =============================================================================
+// Classification types
+// =============================================================================
+
+/// Classification of a test failure relative to a baseline branch.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum FailureClassification {
+    /// Failed now, passed or absent on baseline branch
+    New,
+    /// Failed on both current and baseline branch
+    PreExisting,
+    /// Known flaky from historical flip-rate analysis
+    Flaky,
+    /// No baseline data available
+    Unknown,
+}
+
+impl std::fmt::Display for FailureClassification {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FailureClassification::New => write!(f, "new"),
+            FailureClassification::PreExisting => write!(f, "pre_existing"),
+            FailureClassification::Flaky => write!(f, "flaky"),
+            FailureClassification::Unknown => write!(f, "unknown"),
+        }
+    }
+}
+
+/// A test failure with its classification.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClassifiedFailure {
+    pub name: String,
+    pub file_path: Option<String>,
+    pub error: Option<String>,
+    pub duration_ms: f64,
+    pub classification: FailureClassification,
+    /// Flip rate if classified as flaky (0.0-1.0)
+    pub flip_rate: Option<f64>,
+}
+
+/// Result of classifying all failures in a test run.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClassificationResult {
+    pub baseline_branch: Option<String>,
+    pub classified_failures: Vec<ClassifiedFailure>,
+}
+
+// =============================================================================
+// Coverage delta types
+// =============================================================================
+
+/// Change in coverage metrics between current run and baseline.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CoverageDelta {
+    /// Line coverage change in percentage points (current - baseline)
+    pub lines_delta: f64,
+    /// Branch coverage change in percentage points
+    pub branches_delta: f64,
+    /// Function coverage change in percentage points
+    pub functions_delta: f64,
+}
+
+// =============================================================================
+// Affected tests types
+// =============================================================================
+
+/// A test file that may be affected by a source file change.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AffectedTest {
+    /// Path to the test file (relative to project root)
+    pub test_file: String,
+    /// Confidence score (0.0-1.0)
+    pub confidence: f64,
+    /// Strategy that found this match
+    pub strategy: String,
+    /// Source file that triggered this match
+    pub source_file: String,
+}
+
+/// Result of affected-tests analysis.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AffectedTestsResult {
+    pub affected: Vec<AffectedTest>,
+    /// Suggested command to run the affected tests
+    pub run_command: Option<String>,
+    /// Detected framework name
+    pub framework: Option<String>,
 }
 
 // =============================================================================

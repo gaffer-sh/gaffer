@@ -44,6 +44,7 @@ pub const DEFAULT_REPORT_PATTERNS: &[&str] = &[
     "**/junit*.xml",
     "**/test-results/**/*.xml",
     "**/test-reports/**/*.xml",
+    "**/target/nextest/**/*.xml",
     "**/ctrf/**/*.json",
     "**/ctrf-report.json",
     "**/coverage/lcov.info",

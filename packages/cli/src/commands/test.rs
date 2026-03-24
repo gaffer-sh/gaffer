@@ -12,7 +12,7 @@ use crate::config::Config;
 use crate::discovery;
 use crate::git;
 use crate::output::{json, summary};
-use crate::OutputFormat;
+use crate::{FailOn, OutputFormat};
 
 /// Returns true if GAFFER_DEBUG=1 (or any truthy value) is set.
 fn is_debug() -> bool {
@@ -29,7 +29,7 @@ macro_rules! debug_timing {
 }
 
 /// Run the test command: spawn child, parse reports, store, analyze, print, sync.
-pub fn run(config: &Config, command: &[String], explicit_reports: &[String], format: &OutputFormat, show_errors: bool, compare: Option<&str>) -> Result<i32> {
+pub fn run(config: &Config, command: &[String], explicit_reports: &[String], format: &OutputFormat, show_errors: bool, compare: Option<&str>, fail_on: Option<&FailOn>) -> Result<i32> {
     // 1. Detect git metadata
     let branch = git::detect_branch();
     let commit = git::detect_commit();
@@ -62,13 +62,14 @@ pub fn run(config: &Config, command: &[String], explicit_reports: &[String], for
     let duration_ms = start.elapsed().as_millis() as f64;
 
     // 5. Discover report files (only files written during this run)
+    // When --report is passed with literal file paths (not globs), resolve them directly.
+    // Otherwise, use glob-based discovery with freshness filtering.
     let post_test_start = std::time::Instant::now();
-    let patterns = if !explicit_reports.is_empty() {
-        explicit_reports.to_vec()
+    let report_files = if !explicit_reports.is_empty() {
+        resolve_explicit_reports(explicit_reports, &config.project_root, run_start)
     } else {
-        config.report_patterns.clone()
+        discovery::discover_reports(&config.project_root, &config.report_patterns, run_start)
     };
-    let report_files = discovery::discover_reports(&config.project_root, &patterns, run_start);
     debug_timing!("[gaffer] Discovery: {} files in {:.1}ms", report_files.len(), post_test_start.elapsed().as_secs_f64() * 1000.0);
 
     // 6. Parse reports: separate test reports from coverage files
@@ -206,33 +207,66 @@ pub fn run(config: &Config, command: &[String], explicit_reports: &[String], for
         None
     };
 
+    // 14. Classify failures against baseline branch
+    let classify_start = std::time::Instant::now();
+    let baseline_branch = compare
+        .map(|s| s.to_string())
+        .or_else(|| git::detect_default_branch());
+    let classification = core.classify_failures(
+        &run_id,
+        baseline_branch.as_deref(),
+        &all_tests,
+    );
+    debug_timing!("[gaffer] Classification: {:.1}ms", classify_start.elapsed().as_secs_f64() * 1000.0);
+
     debug_timing!("[gaffer] Total post-test: {:.1}ms", post_test_start.elapsed().as_secs_f64() * 1000.0);
 
     match format {
         OutputFormat::Human => {
             let error_failures = if show_errors { &failures[..] } else { &[] };
-            summary::print_report(&report, error_failures, &context_files, coverage_summary.as_ref(), sync_result.as_ref(), comparison.as_ref());
+            summary::print_report(&report, error_failures, &context_files, coverage_summary.as_ref(), sync_result.as_ref(), comparison.as_ref(), &classification);
         }
         OutputFormat::Json => {
-            if let Err(e) = json::print_json(&report, &failures, &context_files, coverage_summary.as_ref(), sync_result.as_ref(), comparison.as_ref()) {
+            if let Err(e) = json::print_json(&report, &failures, &context_files, coverage_summary.as_ref(), sync_result.as_ref(), comparison.as_ref(), &classification) {
                 eprintln!("[gaffer] Error: failed to serialize JSON output: {}", e);
             }
         }
     }
 
     if report_files.is_empty() {
-        eprintln!(
-            "\n[gaffer] No report files found. Configure patterns in gaffer.toml or use --report.\n\
-             \n\
-             [test]\n\
-             report_patterns = [\"**/test-reports/**/*.xml\", \"**/coverage/lcov.info\"]\n\
-             \n\
-             Or use: gaffer test --report path/to/junit.xml -- <command>"
-        );
+        if !explicit_reports.is_empty() {
+            eprintln!(
+                "\n[gaffer] No report files found at the specified --report path(s). \
+                 Check that the path is correct and the file exists after your test command runs."
+            );
+        } else {
+            eprintln!(
+                "\n[gaffer] No report files found. Configure patterns in gaffer.toml or use --report.\n\
+                 \n\
+                 [test]\n\
+                 report_patterns = [\"**/test-reports/**/*.xml\", \"**/coverage/lcov.info\"]\n\
+                 \n\
+                 Or use: gaffer test --report path/to/junit.xml -- <command>"
+            );
+        }
     }
 
-    // 12. Exit with child process exit code
-    Ok(exit_code)
+    // 15. Determine exit code — --fail-on overrides child exit code
+    let final_exit_code = if let Some(FailOn::New) = fail_on {
+        use gaffer_core::types::FailureClassification;
+        let has_new = classification.classified_failures.iter().any(|f| {
+            matches!(f.classification, FailureClassification::New | FailureClassification::Unknown)
+        });
+        if has_new {
+            exit_code.max(1) // ensure non-zero
+        } else {
+            0 // all failures are pre_existing or flaky — not the developer's fault
+        }
+    } else {
+        exit_code
+    };
+
+    Ok(final_exit_code)
 }
 
 /// Spawn a child process. When `redirect_stdout` is true, the child's stdout
@@ -264,4 +298,46 @@ fn spawn_child(command: &[String], redirect_stdout: bool) -> Result<i32> {
     }
 
     Ok(status.code().unwrap_or(1))
+}
+
+/// Resolve explicit --report paths. Handles both literal file paths and glob patterns.
+/// Literal paths are resolved directly (absolute or relative to project root).
+/// Glob patterns (containing * or ?) are passed through glob-based discovery.
+fn resolve_explicit_reports(
+    reports: &[String],
+    project_root: &std::path::Path,
+    not_before: std::time::SystemTime,
+) -> Vec<PathBuf> {
+    let mut files = Vec::new();
+    let mut glob_patterns = Vec::new();
+
+    for report in reports {
+        let is_glob = report.contains('*') || report.contains('?');
+        if is_glob {
+            glob_patterns.push(report.clone());
+        } else {
+            // Treat as literal file path
+            let path = std::path::Path::new(report);
+            let resolved = if path.is_absolute() {
+                path.to_path_buf()
+            } else {
+                project_root.join(path)
+            };
+            if resolved.is_file() {
+                files.push(resolved);
+            } else {
+                eprintln!(
+                    "[gaffer] Warning: report file not found: {}",
+                    resolved.display()
+                );
+            }
+        }
+    }
+
+    // Any glob patterns go through the standard discovery path
+    if !glob_patterns.is_empty() {
+        files.extend(discovery::discover_reports(project_root, &glob_patterns, not_before));
+    }
+
+    files
 }

@@ -3,6 +3,7 @@
 //! This crate provides the core logic shared by the CLI (`gaffer` binary) and
 //! potentially the NAPI module. It has zero Node.js / NAPI dependencies.
 
+pub mod affected;
 pub mod db;
 pub mod error;
 pub mod intel;
@@ -349,6 +350,9 @@ impl GafferCore {
         let current_pass_rate = pass_rate(current_summary);
         let baseline_pass_rate = pass_rate(&baseline_summary);
 
+        // Compute coverage delta if both runs have coverage
+        let coverage_delta = self.compute_coverage_delta(&db, current_run_id, &baseline_run_id);
+
         Ok(Some(ComparisonResult {
             baseline_branch: baseline_branch.to_string(),
             baseline_run_id,
@@ -358,6 +362,7 @@ impl GafferCore {
             pass_rate_delta: current_pass_rate - baseline_pass_rate,
             duration_delta: current_summary.duration - baseline_summary.duration,
             total_delta: current_summary.total - baseline_summary.total,
+            coverage_delta,
         }))
     }
 
@@ -378,6 +383,120 @@ impl GafferCore {
 
         self.try_compute_intelligence(&db, &target_run_id)
             .ok_or_else(|| GafferError::NotFound("Failed to compute intelligence".to_string()))
+    }
+
+    // -----------------------------------------------------------------------
+    // Classification — classify failures as new/pre_existing/flaky/unknown
+    // -----------------------------------------------------------------------
+
+    /// Classify all failures in the current run against a baseline branch.
+    /// Returns classified failures with their type (new, pre_existing, flaky, unknown).
+    pub fn classify_failures(
+        &self,
+        run_id: &str,
+        baseline_branch: Option<&str>,
+        failures: &[TestEvent],
+    ) -> ClassificationResult {
+        if failures.is_empty() {
+            return ClassificationResult {
+                baseline_branch: baseline_branch.map(|s| s.to_string()),
+                classified_failures: Vec::new(),
+            };
+        }
+
+        let db = match self.lock_db() {
+            Ok(db) => db,
+            Err(e) => {
+                eprintln!("[gaffer] Warning: classification failed (DB error): {}", e);
+                return self.all_unknown(baseline_branch, failures);
+            }
+        };
+
+        // Get flaky tests from history
+        let flaky_set: std::collections::HashMap<String, f64> = match db.get_historical_test_results(20) {
+            Ok(history) => {
+                intel::flaky::detect_flaky_tests(&history)
+                    .into_iter()
+                    .map(|f| (f.test_name.clone(), f.flip_rate))
+                    .collect()
+            }
+            Err(_) => std::collections::HashMap::new(),
+        };
+
+        // Try to compare against baseline
+        let baseline = baseline_branch.and_then(|branch| {
+            match db.get_latest_run_for_branch(branch, run_id) {
+                Ok(Some((baseline_run_id, _))) => {
+                    match db.get_test_statuses_for_run(&baseline_run_id) {
+                        Ok(statuses) => Some(statuses.into_iter().collect::<std::collections::HashMap<String, String>>()),
+                        Err(_) => None,
+                    }
+                }
+                _ => None,
+            }
+        });
+
+        let classified = failures
+            .iter()
+            .filter(|t| t.status == status::FAILED)
+            .map(|t| {
+                let classification = if let Some(flip_rate) = flaky_set.get(&t.name) {
+                    // Flaky takes priority
+                    return ClassifiedFailure {
+                        name: t.name.clone(),
+                        file_path: t.file_path.clone(),
+                        error: t.error.clone(),
+                        duration_ms: t.duration,
+                        classification: FailureClassification::Flaky,
+                        flip_rate: Some(*flip_rate),
+                    };
+                } else if let Some(baseline_map) = &baseline {
+                    let baseline_failed = baseline_map
+                        .get(&t.name)
+                        .map(|s| s == status::FAILED)
+                        .unwrap_or(false);
+                    if baseline_failed {
+                        FailureClassification::PreExisting
+                    } else {
+                        FailureClassification::New
+                    }
+                } else {
+                    FailureClassification::Unknown
+                };
+
+                ClassifiedFailure {
+                    name: t.name.clone(),
+                    file_path: t.file_path.clone(),
+                    error: t.error.clone(),
+                    duration_ms: t.duration,
+                    classification,
+                    flip_rate: None,
+                }
+            })
+            .collect();
+
+        ClassificationResult {
+            baseline_branch: baseline_branch.map(|s| s.to_string()),
+            classified_failures: classified,
+        }
+    }
+
+    fn all_unknown(&self, baseline_branch: Option<&str>, failures: &[TestEvent]) -> ClassificationResult {
+        ClassificationResult {
+            baseline_branch: baseline_branch.map(|s| s.to_string()),
+            classified_failures: failures
+                .iter()
+                .filter(|t| t.status == status::FAILED)
+                .map(|t| ClassifiedFailure {
+                    name: t.name.clone(),
+                    file_path: t.file_path.clone(),
+                    error: t.error.clone(),
+                    duration_ms: t.duration,
+                    classification: FailureClassification::Unknown,
+                    flip_rate: None,
+                })
+                .collect(),
+        }
     }
 }
 
@@ -459,6 +578,30 @@ impl GafferCore {
             flaky_count,
             previous_score,
         ))
+    }
+
+    /// Compute coverage delta between two runs. Returns None if either run lacks coverage.
+    fn compute_coverage_delta(
+        &self,
+        db: &db::Database,
+        current_run_id: &str,
+        baseline_run_id: &str,
+    ) -> Option<CoverageDelta> {
+        let current_cov = db.get_coverage_for_run(current_run_id).ok()??;
+        let baseline_cov = db.get_coverage_for_run(baseline_run_id).ok()??;
+
+        let pct = |covered: i32, total: i32| -> f64 {
+            if total > 0 { (covered as f64 / total as f64) * 100.0 } else { 0.0 }
+        };
+
+        Some(CoverageDelta {
+            lines_delta: pct(current_cov.lines.covered, current_cov.lines.total)
+                - pct(baseline_cov.lines.covered, baseline_cov.lines.total),
+            branches_delta: pct(current_cov.branches.covered, current_cov.branches.total)
+                - pct(baseline_cov.branches.covered, baseline_cov.branches.total),
+            functions_delta: pct(current_cov.functions.covered, current_cov.functions.total)
+                - pct(baseline_cov.functions.covered, baseline_cov.functions.total),
+        })
     }
 }
 

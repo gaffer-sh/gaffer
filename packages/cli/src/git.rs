@@ -94,5 +94,49 @@ pub fn detect_ci_provider() -> Option<String> {
     if std::env::var("TRAVIS").is_ok() {
         return Some("travis".to_string());
     }
+    if std::env::var("TF_BUILD").is_ok() {
+        return Some("azure-devops".to_string());
+    }
+    if std::env::var("BITBUCKET_PIPELINE_UUID").is_ok() {
+        return Some("bitbucket".to_string());
+    }
+    if std::env::var("WOODPECKER").is_ok() {
+        return Some("woodpecker".to_string());
+    }
+    None
+}
+
+/// Detect the default branch name for the repository.
+/// Tries `git symbolic-ref refs/remotes/origin/HEAD`, then falls back to
+/// checking if "main" or "master" branches exist locally.
+pub fn detect_default_branch() -> Option<String> {
+    // Try git symbolic-ref first (requires `git remote set-head origin --auto` to have run)
+    if let Some(branch) = Command::new("git")
+        .args(["symbolic-ref", "refs/remotes/origin/HEAD"])
+        .output()
+        .ok()
+        .and_then(|o| {
+            if o.status.success() {
+                let refpath = String::from_utf8_lossy(&o.stdout).trim().to_string();
+                // Strip "refs/remotes/origin/" prefix
+                refpath.strip_prefix("refs/remotes/origin/").map(|s| s.to_string())
+            } else {
+                None
+            }
+        })
+    {
+        return Some(branch);
+    }
+
+    // Fallback: check if "main" or "master" exist as local branches
+    for candidate in &["main", "master"] {
+        let result = Command::new("git")
+            .args(["rev-parse", "--verify", &format!("refs/heads/{}", candidate)])
+            .output();
+        if result.is_ok_and(|o| o.status.success()) {
+            return Some(candidate.to_string());
+        }
+    }
+
     None
 }
