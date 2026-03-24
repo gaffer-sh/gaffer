@@ -416,7 +416,7 @@ dependencies = [
 
 [[package]]
 name = "gaffer"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -435,7 +435,7 @@ dependencies = [
 
 [[package]]
 name = "gaffer-core"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "chrono",
  "gaffer-parsers",
@@ -451,7 +451,7 @@ dependencies = [
 
 [[package]]
 name = "gaffer-parsers"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "quick-xml",
  "serde",
