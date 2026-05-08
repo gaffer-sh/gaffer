@@ -1,6 +1,6 @@
 [package]
 name = "gaffer-core"
-version = "0.3.0"
+version = "0.1.0"
 edition = "2021"
 publish = false
 description = "Core library for Gaffer test analytics"
@@ -21,6 +21,32 @@ regex = "1"
 ureq = { version = "3", features = [ "json" ] }
 thiserror = "2"
 gaffer-parsers = { path = "../gaffer-parsers" }
+# Async HTTP — used only by the `upload` module so the binary can do bounded
+# parallel multipart-PUTs (see TASK-40). The rest of gaffer-core stays sync.
+tokio = { version = "1", features = [
+  "rt-multi-thread",
+  "macros",
+  "sync",
+  "time",
+  "fs"
+] }
+reqwest = { version = "0.12", default-features = false, features = [
+  "rustls-tls",
+  "json",
+  "multipart",
+  "stream"
+] }
+futures = "0.3"
+bytes = "1"
+walkdir = "2"
 
 [dev-dependencies]
 tempfile = "3"
+wiremock = "0.6"
+tokio = { version = "1", features = [
+  "rt-multi-thread",
+  "macros",
+  "sync",
+  "time",
+  "fs"
+] }

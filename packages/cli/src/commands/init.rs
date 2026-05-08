@@ -1,4 +1,5 @@
 //! `gaffer init` — interactive setup: framework detection, reporter guidance, auth, config generation.
+//! `gaffer init --global` — set up global authentication (writes to ~/.config/gaffer/).
 
 use std::path::Path;
 use std::thread;
@@ -14,6 +15,14 @@ use crate::framework::{self, Framework, PatchResult};
 const DEFAULT_API_URL: &str = "https://app.gaffer.sh";
 const SESSION_POLL_INTERVAL: Duration = Duration::from_secs(2);
 const SESSION_TIMEOUT: Duration = Duration::from_secs(300); // 5 minutes
+
+/// Monorepo marker files to check in parent directories.
+const MONOREPO_MARKERS: &[&str] = &[
+    "pnpm-workspace.yaml",
+    "turbo.json",
+    "nx.json",
+    "lerna.json",
+];
 
 pub fn run(project_root: &Path, api_url: Option<&str>) -> Result<()> {
     let api_base = api_url.unwrap_or(DEFAULT_API_URL);
@@ -39,6 +48,19 @@ pub fn run(project_root: &Path, api_url: Option<&str>) -> Result<()> {
     }
 
     println!();
+
+    // 2b. Monorepo detection — show guidance if in a monorepo
+    if is_in_monorepo(project_root) {
+        println!(
+            "  {} Monorepo detected. This config applies to tests run from",
+            "Note:".bold()
+        );
+        println!("  this directory and below. For other packages, run {} in each,",
+            "gaffer init".bold()
+        );
+        println!("  or use {} for a default token.", "gaffer init --global".bold());
+        println!();
+    }
 
     // 3. Cloud auth (optional)
     let token = if prompt_cloud_connect()? {
@@ -99,6 +121,96 @@ pub fn run(project_root: &Path, api_url: Option<&str>) -> Result<()> {
     println!();
 
     Ok(())
+}
+
+/// `gaffer init --global` — authenticate and write to the global config directory.
+/// Skips framework detection, reporter guidance, report patterns, and .gitignore.
+pub fn run_global(api_url: Option<&str>) -> Result<()> {
+    let api_base = api_url.unwrap_or(DEFAULT_API_URL);
+
+    println!();
+    println!("  {} Setting up global Gaffer authentication", "Global:".bold());
+    println!("  This token will be used as a fallback when no local .gaffer/config.toml exists.");
+    println!();
+
+    // Auth flow
+    let token = match authenticate(api_base) {
+        Ok(t) => t,
+        Err(e) => {
+            anyhow::bail!("Authentication failed: {}. Please check your network and try again.", e);
+        }
+    };
+
+    // Write global config (auth only — no report patterns)
+    let persist_api_url = if api_base != DEFAULT_API_URL { Some(api_base) } else { None };
+    config::write_global_config(Some(&token), persist_api_url)
+        .context("Failed to write global config")?;
+
+    let global_path = config::global_config_path()
+        .map(|p| p.display().to_string())
+        .unwrap_or_else(|| "~/.config/gaffer/config.toml".to_string());
+    println!("  {} {}", "Created:".green().bold(), global_path);
+
+    println!();
+    println!(
+        "  {} {} now works from any directory.",
+        "Done!".green().bold(),
+        "gaffer test".bold()
+    );
+    println!(
+        "  Local .gaffer/config.toml files will take priority over this global config."
+    );
+    println!();
+
+    Ok(())
+}
+
+/// Check if the project is inside a monorepo by looking for workspace marker files
+/// in the current directory or parent directories.
+fn is_in_monorepo(project_root: &Path) -> bool {
+    let mut dir = project_root.to_path_buf();
+
+    loop {
+        // Check simple marker files
+        for marker in MONOREPO_MARKERS {
+            if dir.join(marker).exists() {
+                return true;
+            }
+        }
+
+        // Check package.json for "workspaces" field
+        let pkg_json = dir.join("package.json");
+        if pkg_json.exists() {
+            if let Ok(content) = std::fs::read_to_string(&pkg_json) {
+                if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
+                    if json.get("workspaces").is_some() {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        // Check Cargo.toml for [workspace] section
+        let cargo_toml = dir.join("Cargo.toml");
+        if cargo_toml.exists() {
+            if let Ok(content) = std::fs::read_to_string(&cargo_toml) {
+                if content.contains("[workspace]") {
+                    return true;
+                }
+            }
+        }
+
+        // Check go.work
+        if dir.join("go.work").exists() {
+            return true;
+        }
+
+        if !dir.pop() {
+            break;
+        }
+    }
+
+    false
 }
 
 fn show_reporter_status(framework: &Framework) {

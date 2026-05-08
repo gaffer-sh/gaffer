@@ -39,11 +39,14 @@ jobs:
           - target: aarch64-unknown-linux-gnu
             runner: ubuntu-latest
             use_zigbuild: true
+          - target: x86_64-pc-windows-gnu
+            runner: ubuntu-latest
+            use_zigbuild: true
 
     runs-on: ${{ matrix.runner }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -69,11 +72,15 @@ jobs:
       - name: Package
         run: |
           cd target/${{ matrix.target }}/release
-          tar czf ../../../gaffer-${{ matrix.target }}.tar.gz gaffer
+          if [[ "${{ matrix.target }}" == *windows* ]]; then
+            tar czf ../../../gaffer-${{ matrix.target }}.tar.gz gaffer.exe
+          else
+            tar czf ../../../gaffer-${{ matrix.target }}.tar.gz gaffer
+          fi
           cd ../../..
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: gaffer-${{ matrix.target }}
           path: gaffer-${{ matrix.target }}.tar.gz
@@ -83,7 +90,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Determine tag
         id: tag
@@ -115,19 +122,19 @@ jobs:
           fi
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           path: artifacts
 
       - name: Verify all artifacts present
         run: |
-          for target in aarch64-apple-darwin x86_64-apple-darwin x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu; do
+          for target in aarch64-apple-darwin x86_64-apple-darwin x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu x86_64-pc-windows-gnu; do
             if [ ! -f "artifacts/gaffer-$target/gaffer-$target.tar.gz" ]; then
               echo "Error: Missing artifact for $target"
               exit 1
             fi
           done
-          echo "All 4 platform artifacts present."
+          echo "All 5 platform artifacts present."
 
       - name: Collect tarballs and generate checksums
         run: |

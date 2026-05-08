@@ -60,17 +60,42 @@ pub fn run(config: &Config) -> Result<()> {
 }
 
 fn check_config(config: &Config) {
-    let config_path = config.project_root.join(".gaffer/config.toml");
-    let alt_path = config.project_root.join("gaffer.toml");
-
-    if config_path.exists() {
-        pass("Config", &format!("{}", config_path.display()));
-    } else if alt_path.exists() {
-        pass("Config", &format!("{}", alt_path.display()));
-    } else {
-        info("Config", "No config file found (using defaults)");
+    // Show config layers
+    match &config.sources.local_config_path {
+        Some(path) => pass("Local config", &format!("{}", path.display())),
+        None => info("Local config", "Not found (walked up from project root)"),
     }
+
+    match &config.sources.global_config_path {
+        Some(path) => pass("Global config", &format!("{}", path.display())),
+        None => {
+            let hint = crate::config::global_config_path()
+                .map(|p| format!("{} (not found)", p.display()))
+                .unwrap_or_else(|| "Cannot determine home directory".to_string());
+            info("Global config", &hint);
+        }
+    }
+
+    // Show token source
+    let source_desc = format!("{}", config.sources.token);
+    match &config.token {
+        Some(_) => pass("Token source", &source_desc),
+        None => warn("Token source", "Not configured (local-only mode, no cloud sync)"),
+    }
+
     info("Root", &format!("{}", config.project_root.display()));
+
+    // Check for orphaned .gaffer/ directories (data.db but no config.toml)
+    let gaffer_dir = config.project_root.join(".gaffer");
+    if gaffer_dir.join("data.db").exists() && !gaffer_dir.join("config.toml").exists() {
+        warn(
+            "Orphaned dir",
+            &format!(
+                "{} has data.db but no config.toml — run `gaffer init` here or delete it",
+                gaffer_dir.display()
+            ),
+        );
+    }
 }
 
 fn check_database(config: &Config) {
@@ -113,11 +138,7 @@ fn check_token(config: &Config) {
             info("Token", "Not configured (local-only mode)");
         }
         Some(token) => {
-            let masked = if token.len() > 8 {
-                format!("{}...{}", &token[..4], &token[token.len()-4..])
-            } else {
-                "****".to_string()
-            };
+            let masked = crate::config::mask_token(token);
 
             let base_url = config.api_url.as_deref().unwrap_or("https://app.gaffer.sh").trim_end_matches('/');
             let url = format!("{}/api/v1/user/projects", base_url);

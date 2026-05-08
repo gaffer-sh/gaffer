@@ -10,6 +10,7 @@ pub mod intel;
 pub mod parsers;
 pub mod sync;
 pub mod types;
+pub mod upload;
 
 use std::path::PathBuf;
 use std::sync::Mutex;
