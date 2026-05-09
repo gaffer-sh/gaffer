@@ -3,7 +3,7 @@ resolver = "2"
 members = [
   "packages/gaffer-core",
   "packages/gaffer-parsers",
-  "packages/cli"
+  "packages/cli",
 ]
 
 [profile.release]

@@ -1,4 +1,4 @@
-//! Flaky test detection — ported from `server/utils/flaky-detection.ts`.
+//! Flaky test detection — ported from the dashboard's TS implementation.
 //!
 //! Detects flaky tests by analyzing status transitions ("flips") across historical runs.
 //! A test that alternates between pass and fail is considered flaky.

@@ -10,8 +10,27 @@ use crate::framework;
 use crate::OutputFormat;
 
 /// Run the affected-tests command: scan for test files, generate run command.
-pub fn run(project_root: &Path, files: &[String], format: &OutputFormat) -> Result<()> {
-    let affected = affected::find_affected_tests(project_root, files);
+///
+/// When `graph` is true, the import-graph strategy runs. By default the
+/// graph is persisted at `<project>/.gaffer/graph.db` and incrementally
+/// updated on subsequent calls (~10–50× faster than rebuilding from
+/// scratch). Setting `no_cache` to true forces an in-memory build —
+/// useful for ephemeral CI runs or read-only filesystems where writing
+/// to `.gaffer/` is undesirable. Cache failures (corrupt DB, permission
+/// denied) automatically degrade to in-memory with a stderr warning;
+/// the user always gets a result.
+pub fn run(
+    project_root: &Path,
+    files: &[String],
+    format: &OutputFormat,
+    graph: bool,
+    no_cache: bool,
+) -> Result<()> {
+    let affected = if graph {
+        run_graph_strategy(project_root, files, no_cache)
+    } else {
+        affected::find_affected_tests(project_root, files)
+    };
 
     // Detect framework for run command generation
     let frameworks = framework::detect_frameworks(project_root);
@@ -34,6 +53,30 @@ pub fn run(project_root: &Path, files: &[String], format: &OutputFormat) -> Resu
     }
 
     Ok(())
+}
+
+/// Run the graph strategy with cache-first / in-memory fallback. Cache
+/// errors are non-fatal: we log to stderr and rebuild from scratch.
+fn run_graph_strategy(
+    project_root: &Path,
+    files: &[String],
+    no_cache: bool,
+) -> Vec<gaffer_core::types::AffectedTest> {
+    if no_cache {
+        return affected::find_affected_tests_with_graph(project_root, files);
+    }
+    let cache_db = project_root.join(".gaffer").join("graph.db");
+    match affected::find_affected_tests_with_graph_cached(project_root, files, &cache_db) {
+        Ok(result) => result,
+        Err(e) => {
+            eprintln!(
+                "[gaffer] graph cache unavailable ({}); falling back to in-memory build. \
+                 Pass --no-cache to silence this warning.",
+                e
+            );
+            affected::find_affected_tests_with_graph(project_root, files)
+        }
+    }
 }
 
 /// Generate a run command for the detected framework and affected test files.

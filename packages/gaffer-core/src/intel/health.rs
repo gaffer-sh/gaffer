@@ -1,4 +1,4 @@
-//! Health score calculation — ported from `server/utils/health-score.ts`.
+//! Health score calculation — ported from the dashboard's TS implementation.
 //!
 //! Computes a 0–100 health score combining pass rate, stability (flakiness),
 //! and trend direction.

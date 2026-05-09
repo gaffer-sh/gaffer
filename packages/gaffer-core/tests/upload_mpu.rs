@@ -101,7 +101,7 @@ async fn mpu_happy_path_with_three_parts() {
     let _ = big; // referenced to silence unused warning if removed later
 
     // /create asserts X-API-Key + the request body shape matches the
-    // dashboard's Zod schema in apps/dashboard/server/api/upload/mpu/create.post.ts.
+    // dashboard's Zod schema for its multipart-upload create endpoint.
     Mock::given(method("POST"))
         .and(path("/api/upload/mpu/create"))
         .and(header("X-API-Key", "gfr_test"))

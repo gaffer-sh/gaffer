@@ -1,4 +1,4 @@
-//! Failure clustering — ported from `server/utils/failure-clustering.ts`.
+//! Failure clustering — ported from the dashboard's TS implementation.
 //!
 //! Groups failed tests with similar error messages using Levenshtein distance
 //! to identify patterns caused by the same root issue.

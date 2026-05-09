@@ -6,6 +6,7 @@
 pub mod affected;
 pub mod db;
 pub mod error;
+pub mod graph;
 pub mod intel;
 pub mod parsers;
 pub mod sync;

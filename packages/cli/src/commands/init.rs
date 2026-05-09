@@ -258,7 +258,7 @@ fn authenticate(api_base: &str) -> Result<String> {
         .context("Missing session URL")?
         .to_string();
 
-    // 2. Show verify code (last 6 chars — must match apps/dashboard/app/pages/cli/setup.vue)
+    // 2. Show verify code (last 6 chars — must match the dashboard's CLI-setup page)
     let verify_code = if code.len() >= 6 {
         &code[code.len() - 6..]
     } else {

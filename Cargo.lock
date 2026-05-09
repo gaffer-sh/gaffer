@@ -324,6 +324,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d0a5c400df2834b80a4c3327b3aad3a4c4cd4de0629063962b03235697506a28"
 
 [[package]]
+name = "dashboard-affected-tests"
+version = "0.0.0"
+dependencies = [
+ "gaffer-core",
+ "tempfile",
+]
+
+[[package]]
 name = "deadpool"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -550,7 +558,7 @@ dependencies = [
 
 [[package]]
 name = "gaffer"
-version = "0.4.0"
+version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",

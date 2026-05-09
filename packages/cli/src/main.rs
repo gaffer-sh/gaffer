@@ -92,6 +92,9 @@ enum Commands {
     /// multipart POST, and large files individually through R2 multipart
     /// upload (8-way concurrent part PUTs, automatic retry on 5xx/network).
     ///
+    /// Limits: per-file ceiling is 5 GB (raise --max-file-size-mb to 5000).
+    /// Multipart elevation above 90 MB is automatic — no extra flag needed.
+    ///
     /// Examples:
     ///   gaffer upload ./test-results --token gfr_...
     ///   gaffer upload report.xml playwright-trace.zip --commit-sha $GITHUB_SHA --branch main
@@ -129,7 +132,7 @@ enum Commands {
         #[arg(long, default_value_t = 300)]
         timeout: u64,
 
-        /// Per-file size limit in MB (default: 100). Files above this are rejected up front.
+        /// Per-file size limit in MB (default: 100; platform max: 5000 / 5 GB). Files above this are rejected up front.
         #[arg(long, default_value_t = 100)]
         max_file_size_mb: u64,
 
@@ -181,6 +184,23 @@ enum Commands {
         /// Output format: human or json
         #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
         format: OutputFormat,
+
+        /// Also use static import-graph reverse-reachability. First call
+        /// builds the graph by walking the project; subsequent calls
+        /// incrementally update only files whose mtime has changed,
+        /// persisted to `<project>/.gaffer/graph.db`. Finds tests the
+        /// heuristic misses, especially in monorepos where tests live
+        /// in dedicated directories.
+        #[arg(long)]
+        graph: bool,
+
+        /// With `--graph`, force an in-memory build instead of using the
+        /// SQLite cache at `.gaffer/graph.db`. Useful for ephemeral CI
+        /// runs and read-only filesystems. Cache failures already fall
+        /// back to in-memory automatically; this flag silences the
+        /// fallback warning.
+        #[arg(long)]
+        no_cache: bool,
     },
 
     /// Diagnose common setup issues
@@ -357,9 +377,13 @@ fn main() {
             files,
             data_dir,
             format,
+            graph,
+            no_cache,
         } => {
             let project_root = resolve_data_dir(data_dir.as_ref());
-            if let Err(e) = commands::affected_tests::run(&project_root, &files, &format) {
+            if let Err(e) =
+                commands::affected_tests::run(&project_root, &files, &format, graph, no_cache)
+            {
                 eprintln!("[gaffer] Error: {:#}", e);
                 process::exit(1);
             }

@@ -1,4 +1,4 @@
-//! Duration analytics — ported from `server/utils/duration-analytics.ts`.
+//! Duration analytics — ported from the dashboard's TS implementation.
 //!
 //! Computes percentiles (p50/p75/p90/p95/p99), mean duration, and identifies
 //! the slowest tests in a run.
