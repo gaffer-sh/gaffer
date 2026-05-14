@@ -4,6 +4,14 @@ Test analytics and intelligence for your CI pipeline. Run tests, detect flaky te
 
 ## Install
 
+Homebrew (macOS, Linux):
+
+```sh
+brew install gaffer-sh/tap/gaffer
+```
+
+Or via the install script (macOS, Linux):
+
 ```sh
 curl -fsSL https://app.gaffer.sh/install.sh | sh
 ```
