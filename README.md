@@ -41,8 +41,21 @@ Wraps your test command and analyzes the results. Discovers report files (JUnit 
 | `--format json` | JSON output to stdout (default: human-readable stderr) |
 | `--show-errors` | Show full error messages and context for failed tests |
 | `--compare <branch>` | Compare against the latest run on a branch (e.g. `--compare=main`) |
+| `--fail-on <mode>` | Override exit code by failure classification (`new` exits 0 when only pre-existing or flaky failures exist) |
+| `--affected` | Derive the wrapped command from `affected-tests`. Use with `--files`. Trailing `-- <cmd>` is ignored when set |
+| `--files <paths>` | Changed source files. Only meaningful with `--affected` (repeatable) |
+| `--no-graph` | With `--affected`, disable the import-graph strategy |
+| `--no-cache` | With `--affected`, force an in-memory graph build instead of using `.gaffer/graph.db` |
+| `--on-empty <auto\|skip\|fail>` | With `--affected`, exit-code policy when no tests are affected. `auto` (default) exits 0 only when all detection signals were available; `skip` always 0; `fail` always non-zero |
 | `--token <token>` | Auth token (overrides `GAFFER_TOKEN` env var and config) |
 | `--root <path>` | Project root directory (default: `.`) |
+
+**Run only affected tests:**
+
+```sh
+# Map changed source files to affected tests and run them in one invocation
+gaffer test --affected --files src/auth.ts src/api.ts
+```
 
 ### `gaffer query <subcommand>`
 
@@ -56,6 +69,26 @@ Query local test intelligence from the `.gaffer/data.db` database. Returns JSON 
 | `runs` | Recent test runs with counts (`--limit`, default 20) |
 | `history <test>` | Pass/fail history for a specific test (`--limit`, default 50) |
 | `failures <pattern>` | Search failures by error/name pattern (`--limit`, default 50) |
+
+### `gaffer affected-tests`
+
+Map changed source files to relevant test specs. Returns affected test files and a suggested run command. Runs three strategies by default: naming convention, directory proximity, and static import-graph reverse-reachability.
+
+```sh
+gaffer affected-tests --files src/auth.ts src/api.ts
+```
+
+| Flag | Description |
+|------|-------------|
+| `--files <paths>` | Changed source files (required, repeatable) |
+| `--format <human\|json>` | Output format (default: `json`) |
+| `--pretty` | Human-readable output. Equivalent to `--format human` |
+| `--no-graph` | Disable the import-graph strategy; use naming + proximity only |
+| `--no-cache` | Force in-memory graph build instead of using `.gaffer/graph.db` |
+| `--print-cmd` | Print only the bare `run_command` string to stdout; exit 1 if none is available |
+| `--root <path>` | Project root directory (default: `.`) |
+
+The JSON output includes a `signals` object listing which detection sources were attempted and which were unavailable, so callers can distinguish "no affected tests" from "ran in degraded mode."
 
 ### `gaffer init`
 
