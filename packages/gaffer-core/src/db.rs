@@ -36,6 +36,7 @@ pub struct HistoricalTest {
     pub file_path: String,
     pub run_id: String,
     pub started_at: String,
+    pub error_message: Option<String>,
 }
 
 /// A failed test from the current run, used by failure clustering.
@@ -263,7 +264,7 @@ impl Database {
         run_limit: u32,
     ) -> Result<Vec<HistoricalTest>, rusqlite::Error> {
         let mut stmt = self.conn.prepare(
-            "SELECT te.name, te.status, te.duration_ms, COALESCE(te.file_path, ''), tr.id, tr.started_at
+            "SELECT te.name, te.status, te.duration_ms, COALESCE(te.file_path, ''), tr.id, tr.started_at, te.error_message
              FROM test_executions te
              JOIN test_runs tr ON te.run_id = tr.id
              WHERE tr.status = 'finished'
@@ -284,6 +285,7 @@ impl Database {
                 file_path: row.get(3)?,
                 run_id: row.get(4)?,
                 started_at: row.get(5)?,
+                error_message: row.get(6)?,
             })
         })?;
 

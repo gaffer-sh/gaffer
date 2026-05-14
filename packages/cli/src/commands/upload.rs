@@ -84,21 +84,19 @@ fn resolve_token(flag: Option<String>) -> Result<String, UploadError> {
     if let Some(t) = flag.filter(|s| !s.is_empty()) {
         return Ok(t);
     }
-    // Honour both env var names — the GitHub Action exposes
-    // GAFFER_UPLOAD_TOKEN; legacy scripts may have GAFFER_TOKEN.
-    if let Ok(t) = std::env::var("GAFFER_UPLOAD_TOKEN") {
-        if !t.is_empty() {
-            return Ok(t);
-        }
-    }
-    if let Ok(t) = std::env::var("GAFFER_TOKEN") {
-        if !t.is_empty() {
-            return Ok(t);
+    // Canonical env var is GAFFER_PROJECT_TOKEN. Older configurations may
+    // set GAFFER_UPLOAD_TOKEN (the previous name) or GAFFER_TOKEN — both
+    // remain supported as fallbacks so existing CI keeps working.
+    for var in ["GAFFER_PROJECT_TOKEN", "GAFFER_UPLOAD_TOKEN", "GAFFER_TOKEN"] {
+        if let Ok(t) = std::env::var(var) {
+            if !t.is_empty() {
+                return Ok(t);
+            }
         }
     }
     Err(UploadError::user(
         "missing_token",
-        "Upload token not provided. Pass --token or set GAFFER_UPLOAD_TOKEN.",
+        "Project token not provided. Pass --token or set GAFFER_PROJECT_TOKEN.",
     ))
 }
 
@@ -170,7 +168,7 @@ fn emit_error(err: &UploadError) {
 fn classify_cause(err: &UploadError) -> &'static str {
     match err {
         UploadError::UserError { kind, .. } => match *kind {
-            "missing_token" => "no upload token was supplied",
+            "missing_token" => "no project token was supplied",
             "no_files" => "the path did not resolve to any files",
             "file_too_large" => "a file exceeds the configured per-file limit",
             "path_not_found" => "the path does not exist or is unreadable",
@@ -180,7 +178,7 @@ fn classify_cause(err: &UploadError) -> &'static str {
             _ => "client-side validation rejected the request",
         },
         UploadError::ServerError { kind, status, .. } => match *kind {
-            "auth_failed" => "the dashboard rejected the upload token",
+            "auth_failed" => "the dashboard rejected the project token",
             "quota_exceeded" => "the org's storage quota would be exceeded",
             "file_too_large" => "the dashboard reported the file as too large",
             "server_error" => "the dashboard returned a transient error after retries",
@@ -199,7 +197,7 @@ fn classify_cause(err: &UploadError) -> &'static str {
 fn suggested_fix(err: &UploadError) -> &'static str {
     match err {
         UploadError::UserError { kind, .. } => match *kind {
-            "missing_token" => "pass --token <gfr_…> or set GAFFER_UPLOAD_TOKEN",
+            "missing_token" => "pass --token <gfr_…> or set GAFFER_PROJECT_TOKEN",
             "no_files" => "verify the path or glob expands to at least one file",
             "file_too_large" => "raise --max-file-size-mb or split the file",
             "path_not_found" => "double-check the path and CI working directory",
@@ -207,7 +205,7 @@ fn suggested_fix(err: &UploadError) -> &'static str {
             _ => "review the error message and adjust the invocation",
         },
         UploadError::ServerError { kind, .. } => match *kind {
-            "auth_failed" => "regenerate the upload token in the project's settings",
+            "auth_failed" => "regenerate the project token in the project's settings",
             "quota_exceeded" => "upgrade the plan or remove old reports to free space",
             "file_too_large" => "the server's MPU ceiling is 5 GB — split the upload",
             "server_error" => "retry; if it persists, contact support with the Ray ID",

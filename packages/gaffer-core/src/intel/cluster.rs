@@ -149,7 +149,11 @@ fn truncate_at_char_boundary(s: &str, max_bytes: usize) -> String {
 }
 
 /// Normalize an error message for clustering by stripping variable parts.
-fn normalize_error_message(message: &str) -> String {
+///
+/// Also used by `intel::flaky` to fingerprint failure-pattern variance — when the same test fails
+/// repeatedly with different normalized messages, that's a flakiness signal that pure pass/fail
+/// flip rate doesn't capture.
+pub(crate) fn normalize_error_message(message: &str) -> String {
     if message.is_empty() {
         return String::new();
     }

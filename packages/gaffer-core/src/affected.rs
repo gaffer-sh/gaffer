@@ -13,7 +13,70 @@ use std::path::Path;
 
 use crate::error::GafferError;
 use crate::graph::{build_graph, build_graph_cached, has_inline_rust_tests, GraphCache, ImportGraph};
-use crate::types::AffectedTest;
+use crate::types::{AffectedTest, AffectedTestSignal, AffectedTestsSignalCoverage};
+
+/// History-derived candidates for a single changed source file. Produced by a
+/// [`HistorySignalProvider`] (today: a dashboard API client; in tests: a
+/// stub) and consumed by the `coverage_history` / `failure_history`
+/// strategies in `find_affected_tests_with_history`.
+#[derive(Debug, Clone)]
+pub struct HistoryCandidate {
+    /// Test file path, relative to the project root (matching the format
+    /// the other strategies emit).
+    pub test_file: String,
+}
+
+/// Source of history-derived signals (coverage history and failure history)
+/// for the `affected-tests` pipeline.
+///
+/// The trait is intentionally narrow: callers ask for candidates per
+/// changed source file, and a `None` return communicates "this signal is
+/// unavailable on this run" (e.g. the CLI is running without a Gaffer
+/// connection). Empty `Some(vec![])` means "we looked, found nothing" —
+/// a real signal, not a degraded one. That distinction lets us populate
+/// [`AffectedTestsSignalCoverage::unavailable`] correctly so a coding-agent
+/// caller can tell whether to trust an empty result set.
+pub trait HistorySignalProvider {
+    /// Test files that historically executed coverage on the changed source
+    /// file. Returns `None` if the provider has no data available
+    /// (degraded mode).
+    fn coverage_history_candidates(&self, source_file: &str) -> Option<Vec<HistoryCandidate>>;
+
+    /// Test files that have historically failed in commits where the changed
+    /// source file was in the diff. Returns `None` if the provider has no
+    /// data available (degraded mode).
+    fn failure_history_candidates(&self, source_file: &str) -> Option<Vec<HistoryCandidate>>;
+}
+
+/// A null provider that returns `None` for both signals. Used by callers
+/// that don't have a Gaffer connection or aren't ready to thread one
+/// through — keeps the existing `find_affected_tests_with_graph` /
+/// `find_affected_tests` entry points unchanged in behavior.
+#[derive(Debug, Default)]
+pub struct NoHistoryProvider;
+
+impl HistorySignalProvider for NoHistoryProvider {
+    fn coverage_history_candidates(&self, _source_file: &str) -> Option<Vec<HistoryCandidate>> {
+        None
+    }
+    fn failure_history_candidates(&self, _source_file: &str) -> Option<Vec<HistoryCandidate>> {
+        None
+    }
+}
+
+/// Confidence assigned to `coverage_history` hits. Lower than naming
+/// convention (0.9) and import graph (0.7) because the granularity is
+/// test-run-level not test-case-level — a coverage report records "this
+/// run touched these lines" but doesn't slice down to which individual
+/// test case did the touching. For E2E it's still the only signal that
+/// can map server-route changes to specs that hit those routes by URL.
+const COVERAGE_HISTORY_CONFIDENCE: f64 = 0.5;
+
+/// Confidence assigned to `failure_history` hits. Lower than coverage
+/// history because the correlation is statistical — a test that flaked
+/// recently when this file was edited may or may not have actually
+/// exercised it.
+const FAILURE_HISTORY_CONFIDENCE: f64 = 0.4;
 
 /// Maximum entries to scan per directory (prevents slow scans in large monorepos).
 const DIR_ENTRY_LIMIT: usize = 1000;
@@ -153,6 +216,98 @@ fn has_any_non_test_input(changed_files: &[String]) -> bool {
     changed_files.iter().any(|f| !is_test_file(f))
 }
 
+/// Result of `find_affected_tests_with_history`: the deduped affected list
+/// plus signal-coverage metadata so callers can tell which strategies were
+/// available on this run and which were skipped because their data source
+/// was missing (degraded mode).
+#[derive(Debug, Clone)]
+pub struct AffectedTestsRun {
+    pub affected: Vec<AffectedTest>,
+    pub signals: AffectedTestsSignalCoverage,
+}
+
+/// History-aware variant of `find_affected_tests_with_graph`. Unions the
+/// heuristic + (optional) graph strategies with `coverage_history` and
+/// `failure_history` candidates from a [`HistorySignalProvider`].
+///
+/// The provider's `None` returns drive the `signals.unavailable` set, so
+/// callers can distinguish "we ran every signal and found nothing" from
+/// "we ran in degraded mode because Gaffer history wasn't reachable." For
+/// the CLI use case this is what surfaces graph-only mode to coding-agent
+/// consumers honestly.
+///
+/// When `use_graph` is false, only the heuristic + history strategies run.
+/// When `use_graph` is true, the import-graph BFS runs in memory (no cache;
+/// the cached variant has its own entry point because it returns a
+/// `Result<_, GafferError>` that this signature does not expose).
+pub fn find_affected_tests_with_history(
+    project_root: &Path,
+    changed_files: &[String],
+    history: &dyn HistorySignalProvider,
+    use_graph: bool,
+) -> AffectedTestsRun {
+    let mut hits: HashMap<String, Vec<AffectedTest>> = HashMap::new();
+    let mut attempted: Vec<String> = Vec::new();
+    let mut unavailable: Vec<String> = Vec::new();
+
+    apply_per_file_strategies(project_root, changed_files, &mut hits);
+    attempted.push("naming_convention".to_string());
+    attempted.push("directory_proximity".to_string());
+
+    if use_graph && has_any_non_test_input(changed_files) {
+        let (graph, _scanned) = build_graph(project_root);
+        apply_graph_strategy(&graph, changed_files, &mut hits);
+        attempted.push("import_graph".to_string());
+    }
+
+    // History-derived signals. `None` from the provider means the data
+    // source is unavailable on this run — surface that to the caller via
+    // `unavailable`. `Some(vec![])` means the provider looked and found
+    // nothing, which is a real signal and counts as `attempted`.
+    let mut coverage_history_seen = false;
+    let mut coverage_history_unavailable = false;
+    let mut failure_history_seen = false;
+    let mut failure_history_unavailable = false;
+    for source_file in changed_files {
+        if is_test_file(source_file) {
+            continue;
+        }
+        match find_by_coverage_history(source_file, history) {
+            Some(hits_for_file) => {
+                coverage_history_seen = true;
+                for t in hits_for_file {
+                    hits.entry(t.test_file.clone()).or_default().push(t);
+                }
+            }
+            None => coverage_history_unavailable = true,
+        }
+        match find_by_failure_history(source_file, history) {
+            Some(hits_for_file) => {
+                failure_history_seen = true;
+                for t in hits_for_file {
+                    hits.entry(t.test_file.clone()).or_default().push(t);
+                }
+            }
+            None => failure_history_unavailable = true,
+        }
+    }
+    if coverage_history_seen {
+        attempted.push("coverage_history".to_string());
+    } else if coverage_history_unavailable {
+        unavailable.push("coverage_history".to_string());
+    }
+    if failure_history_seen {
+        attempted.push("failure_history".to_string());
+    } else if failure_history_unavailable {
+        unavailable.push("failure_history".to_string());
+    }
+
+    AffectedTestsRun {
+        affected: compose_results(hits),
+        signals: AffectedTestsSignalCoverage { attempted, unavailable },
+    }
+}
+
 /// Strategies 1, 2, 4: heuristic naming-convention + directory-proximity
 /// + Rust inline self-test. All cheap and per-file; the cached and
 /// in-memory variants share this step.
@@ -184,6 +339,7 @@ fn apply_per_file_strategies(
                         confidence: 0.9,
                         strategy: "rust_inline_tests".to_string(),
                         source_file: source_file.clone(),
+                        signals: Vec::new(),
                     };
                     hits.entry(t.test_file.clone()).or_default().push(t);
                 }
@@ -214,6 +370,7 @@ fn apply_graph_strategy(
                 confidence: GRAPH_CONFIDENCE,
                 strategy: "import_graph".to_string(),
                 source_file: source_file.clone(),
+                signals: Vec::new(),
             };
             hits.entry(t.test_file.clone()).or_default().push(t);
         }
@@ -238,7 +395,9 @@ fn compose_results(hits: HashMap<String, Vec<AffectedTest>>) -> Vec<AffectedTest
 
 /// Combine multiple independent confidence observations of the same test
 /// file via noisy-OR. The returned `AffectedTest` carries the highest
-/// individual strategy as the attribution and the combined confidence.
+/// individual strategy as the attribution, the combined confidence, and
+/// the full per-signal contribution list in `signals` (deduped by strategy,
+/// keeping the max confidence per strategy).
 fn combine_noisy_or(mut observations: Vec<AffectedTest>) -> AffectedTest {
     debug_assert!(!observations.is_empty(), "combine_noisy_or called on empty");
 
@@ -256,12 +415,42 @@ fn combine_noisy_or(mut observations: Vec<AffectedTest>) -> AffectedTest {
     }
     let combined = 1.0 - p_not;
 
+    let signals = collect_signals(&observations);
+
     AffectedTest {
         test_file: primary.test_file,
         confidence: combined,
         strategy: primary.strategy,
         source_file: primary.source_file,
+        signals,
     }
+}
+
+/// Collapse multiple observations into a deduped signal list, keeping the
+/// max confidence per strategy. Sorted by confidence descending so the
+/// strongest signal is first — agents reading the JSON can stop scanning
+/// once they've seen enough.
+fn collect_signals(observations: &[AffectedTest]) -> Vec<AffectedTestSignal> {
+    let mut by_strategy: HashMap<&str, f64> = HashMap::new();
+    for obs in observations {
+        let entry = by_strategy.entry(obs.strategy.as_str()).or_insert(0.0);
+        if obs.confidence > *entry {
+            *entry = obs.confidence;
+        }
+    }
+    let mut signals: Vec<AffectedTestSignal> = by_strategy
+        .into_iter()
+        .map(|(strategy, confidence)| AffectedTestSignal {
+            strategy: strategy.to_string(),
+            confidence,
+        })
+        .collect();
+    signals.sort_by(|a, b| {
+        b.confidence
+            .partial_cmp(&a.confidence)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    signals
 }
 
 /// Check if a file path looks like a test file.
@@ -313,6 +502,7 @@ fn find_by_naming_convention(project_root: &Path, source_file: &str, source_path
                     confidence: 0.9,
                     strategy: "naming_convention".to_string(),
                     source_file: source_file.to_string(),
+                    signals: Vec::new(),
                 });
             }
         }
@@ -330,6 +520,7 @@ fn find_by_naming_convention(project_root: &Path, source_file: &str, source_path
                     confidence: 0.9,
                     strategy: "naming_convention".to_string(),
                     source_file: source_file.to_string(),
+                    signals: Vec::new(),
                 });
             }
         }
@@ -349,6 +540,7 @@ fn find_by_naming_convention(project_root: &Path, source_file: &str, source_path
                             confidence: 0.9,
                             strategy: "naming_convention".to_string(),
                             source_file: source_file.to_string(),
+                            signals: Vec::new(),
                         });
                     }
                 }
@@ -357,6 +549,59 @@ fn find_by_naming_convention(project_root: &Path, source_file: &str, source_path
     }
 
     results
+}
+
+/// Strategy 4: Coverage-history reverse lookup.
+///
+/// For each changed source file, ask the [`HistorySignalProvider`] which
+/// test files have historically been part of a test run that produced
+/// coverage rows for that source file. Useful primarily for E2E specs that
+/// don't `import` the code they exercise (they hit URLs), where naming,
+/// proximity, and the import graph all return empty.
+///
+/// Returns `None` if the provider has no data on this source file. The
+/// caller uses that to populate `AffectedTestsSignalCoverage::unavailable`.
+fn find_by_coverage_history(
+    source_file: &str,
+    history: &dyn HistorySignalProvider,
+) -> Option<Vec<AffectedTest>> {
+    let candidates = history.coverage_history_candidates(source_file)?;
+    Some(
+        candidates
+            .into_iter()
+            .map(|c| AffectedTest {
+                test_file: c.test_file,
+                confidence: COVERAGE_HISTORY_CONFIDENCE,
+                strategy: "coverage_history".to_string(),
+                source_file: source_file.to_string(),
+                signals: Vec::new(),
+            })
+            .collect(),
+    )
+}
+
+/// Strategy 5: Failure-history correlation.
+///
+/// For each changed source file, ask the [`HistorySignalProvider`] which
+/// test files have historically failed in commits that touched that source
+/// file. Statistical signal, lower confidence than coverage history.
+fn find_by_failure_history(
+    source_file: &str,
+    history: &dyn HistorySignalProvider,
+) -> Option<Vec<AffectedTest>> {
+    let candidates = history.failure_history_candidates(source_file)?;
+    Some(
+        candidates
+            .into_iter()
+            .map(|c| AffectedTest {
+                test_file: c.test_file,
+                confidence: FAILURE_HISTORY_CONFIDENCE,
+                strategy: "failure_history".to_string(),
+                source_file: source_file.to_string(),
+                signals: Vec::new(),
+            })
+            .collect(),
+    )
 }
 
 /// Strategy 2: Directory proximity matching.
@@ -410,6 +655,7 @@ fn find_by_directory_proximity(project_root: &Path, source_file: &str, source_pa
                         confidence: 0.3,
                         strategy: "directory_proximity".to_string(),
                         source_file: source_file.to_string(),
+                        signals: Vec::new(),
                     });
                 }
             }
@@ -611,18 +857,27 @@ mod tests {
                 confidence: 0.9,
                 strategy: "naming_convention".to_string(),
                 source_file: "x.ts".to_string(),
+                signals: Vec::new(),
             },
             AffectedTest {
                 test_file: "x.test.ts".to_string(),
                 confidence: 0.7,
                 strategy: "import_graph".to_string(),
                 source_file: "x.ts".to_string(),
+                signals: Vec::new(),
             },
         ];
         let combined = combine_noisy_or(observations);
         assert!((combined.confidence - 0.97).abs() < 1e-6, "got {}", combined.confidence);
         // Higher-confidence strategy wins attribution.
         assert_eq!(combined.strategy, "naming_convention");
+        // Both signals surface in the per-test signals list, deduped by
+        // strategy, sorted highest-confidence first.
+        assert_eq!(combined.signals.len(), 2);
+        assert_eq!(combined.signals[0].strategy, "naming_convention");
+        assert!((combined.signals[0].confidence - 0.9).abs() < 1e-6);
+        assert_eq!(combined.signals[1].strategy, "import_graph");
+        assert!((combined.signals[1].confidence - 0.7).abs() < 1e-6);
     }
 
     #[test]
@@ -632,10 +887,148 @@ mod tests {
             confidence: 0.7,
             strategy: "import_graph".to_string(),
             source_file: "x.ts".to_string(),
+            signals: Vec::new(),
         }];
         let combined = combine_noisy_or(observations);
         assert!((combined.confidence - 0.7).abs() < 1e-6);
         assert_eq!(combined.strategy, "import_graph");
+        assert_eq!(combined.signals.len(), 1);
+        assert_eq!(combined.signals[0].strategy, "import_graph");
+    }
+
+    /// Test stub: returns whatever was registered for a given source file.
+    /// `None` for the inner Option means the provider has no data
+    /// (degraded mode) for that source file specifically; `Some(vec![])`
+    /// means "we looked and found nothing." This distinction is what
+    /// drives the signal-coverage tracking in real callers.
+    struct StubHistoryProvider {
+        coverage: HashMap<String, Option<Vec<HistoryCandidate>>>,
+        failure: HashMap<String, Option<Vec<HistoryCandidate>>>,
+    }
+
+    impl StubHistoryProvider {
+        fn new() -> Self {
+            Self { coverage: HashMap::new(), failure: HashMap::new() }
+        }
+        fn with_coverage(mut self, src: &str, tests: Vec<&str>) -> Self {
+            self.coverage.insert(
+                src.to_string(),
+                Some(tests.into_iter().map(|t| HistoryCandidate { test_file: t.to_string() }).collect()),
+            );
+            self
+        }
+        fn with_failure(mut self, src: &str, tests: Vec<&str>) -> Self {
+            self.failure.insert(
+                src.to_string(),
+                Some(tests.into_iter().map(|t| HistoryCandidate { test_file: t.to_string() }).collect()),
+            );
+            self
+        }
+    }
+
+    impl HistorySignalProvider for StubHistoryProvider {
+        fn coverage_history_candidates(&self, source_file: &str) -> Option<Vec<HistoryCandidate>> {
+            self.coverage.get(source_file).cloned().unwrap_or(None)
+        }
+        fn failure_history_candidates(&self, source_file: &str) -> Option<Vec<HistoryCandidate>> {
+            self.failure.get(source_file).cloned().unwrap_or(None)
+        }
+    }
+
+    #[test]
+    fn no_history_provider_is_degraded_mode() {
+        let provider = NoHistoryProvider;
+        assert!(provider.coverage_history_candidates("any/file.ts").is_none());
+        assert!(provider.failure_history_candidates("any/file.ts").is_none());
+    }
+
+    #[test]
+    fn coverage_history_signal_surfaces_e2e_specs_that_lack_static_links() {
+        // The case today's affected-tests can't handle: a server route file
+        // that no spec imports, but which the E2E suite hits via URL. The
+        // import graph + naming + proximity all return empty; coverage
+        // history is the only signal that recovers the link.
+        let dir = temp_dir();
+        let route = dir.path().join("server/api/v1/coverage-summary.get.ts");
+        let e2e = dir.path().join("e2e/projects.spec.ts");
+        fs::create_dir_all(route.parent().unwrap()).unwrap();
+        fs::create_dir_all(e2e.parent().unwrap()).unwrap();
+        fs::write(&route, "export default {}").unwrap();
+        fs::write(&e2e, "// e2e test, no imports of route").unwrap();
+
+        let provider = StubHistoryProvider::new().with_coverage(
+            "server/api/v1/coverage-summary.get.ts",
+            vec!["e2e/projects.spec.ts"],
+        );
+
+        let run = find_affected_tests_with_history(
+            dir.path(),
+            &["server/api/v1/coverage-summary.get.ts".to_string()],
+            &provider,
+            /* use_graph */ false,
+        );
+
+        assert_eq!(run.affected.len(), 1);
+        assert_eq!(run.affected[0].test_file, "e2e/projects.spec.ts");
+        assert_eq!(run.affected[0].strategy, "coverage_history");
+        assert!((run.affected[0].confidence - COVERAGE_HISTORY_CONFIDENCE).abs() < 1e-6);
+        assert!(run.signals.attempted.contains(&"coverage_history".to_string()));
+        assert!(!run.signals.unavailable.contains(&"coverage_history".to_string()));
+    }
+
+    #[test]
+    fn missing_history_provider_marks_signals_unavailable() {
+        // Same fixture, NoHistoryProvider — coverage_history and
+        // failure_history must show up in `unavailable`, not `attempted`,
+        // so the caller can tell the run is in degraded mode.
+        let dir = temp_dir();
+        let route = dir.path().join("server/api/v1/coverage-summary.get.ts");
+        fs::create_dir_all(route.parent().unwrap()).unwrap();
+        fs::write(&route, "export default {}").unwrap();
+
+        let run = find_affected_tests_with_history(
+            dir.path(),
+            &["server/api/v1/coverage-summary.get.ts".to_string()],
+            &NoHistoryProvider,
+            /* use_graph */ false,
+        );
+
+        assert!(run.signals.unavailable.contains(&"coverage_history".to_string()));
+        assert!(run.signals.unavailable.contains(&"failure_history".to_string()));
+        assert!(!run.signals.attempted.contains(&"coverage_history".to_string()));
+    }
+
+    #[test]
+    fn coverage_history_and_naming_convention_combine_via_noisy_or() {
+        // Same test selected by naming convention (0.9) AND coverage
+        // history (0.5). Combined: 1 - (1 - 0.9)(1 - 0.5) = 0.95.
+        // Signals list should carry both contributions.
+        let dir = temp_dir();
+        let src = dir.path().join("src");
+        fs::create_dir_all(&src).unwrap();
+        fs::write(src.join("auth.ts"), "").unwrap();
+        fs::write(src.join("auth.test.ts"), "").unwrap();
+
+        let provider = StubHistoryProvider::new()
+            .with_coverage("src/auth.ts", vec!["src/auth.test.ts"]);
+
+        let run = find_affected_tests_with_history(
+            dir.path(),
+            &["src/auth.ts".to_string()],
+            &provider,
+            /* use_graph */ false,
+        );
+
+        assert_eq!(run.affected.len(), 1);
+        let test = &run.affected[0];
+        assert_eq!(test.test_file, "src/auth.test.ts");
+        assert!((test.confidence - 0.95).abs() < 1e-6, "got {}", test.confidence);
+        // Highest-individual-confidence wins primary attribution.
+        assert_eq!(test.strategy, "naming_convention");
+        // Both signals must appear in the list.
+        let strategies: Vec<&str> = test.signals.iter().map(|s| s.strategy.as_str()).collect();
+        assert!(strategies.contains(&"naming_convention"));
+        assert!(strategies.contains(&"coverage_history"));
     }
 
     #[test]

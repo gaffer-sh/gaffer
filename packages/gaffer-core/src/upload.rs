@@ -268,7 +268,7 @@ pub async fn run(paths: &[PathBuf], config: &UploadConfig) -> UploadResult<Uploa
     if config.token.is_empty() {
         return Err(UploadError::user(
             "missing_token",
-            "Upload token is empty. Pass --token or set GAFFER_UPLOAD_TOKEN.",
+            "Project token is empty. Pass --token or set GAFFER_PROJECT_TOKEN.",
         ));
     }
 

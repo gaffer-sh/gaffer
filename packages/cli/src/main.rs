@@ -34,6 +34,29 @@ pub enum FailOn {
     New,
 }
 
+/// Policy for what `gaffer test --affected` does when no affected tests are found.
+///
+/// The safe default `Auto` only treats a confirmed-empty result (all signals
+/// available, all returned nothing) as success. When some signals were
+/// unavailable — i.e. we don't actually know whether tests are affected, only
+/// that the strategies we could run found nothing — `Auto` exits non-zero so
+/// CI doesn't silently green-light a degraded run. `Skip` and `Fail` are the
+/// explicit overrides for callers that have made an informed decision either
+/// way.
+#[derive(Clone, Copy, PartialEq, ValueEnum)]
+pub enum OnEmpty {
+    /// Exit 0 only when all signals were available; exit non-zero when some
+    /// signals were unavailable (degraded mode). Right balance for both
+    /// iterative dev and CI.
+    Auto,
+    /// Always exit 0 on empty, even if signals were unavailable. Right when
+    /// the caller has explicitly decided silent-skip is correct.
+    Skip,
+    /// Always exit non-zero on empty. Forces the caller to decide whether to
+    /// escalate to a broader run.
+    Fail,
+}
+
 #[derive(Parser)]
 #[command(name = "gaffer", about = "Test analytics and intelligence", version)]
 struct Cli {
@@ -81,8 +104,44 @@ enum Commands {
         #[arg(long, value_enum)]
         fail_on: Option<FailOn>,
 
-        /// The test command to run (everything after --)
-        #[arg(trailing_var_arg = true, required = true)]
+        /// Derive the wrapped command from `affected-tests`. Use with
+        /// `--files <changed-files>`. Collapses the canonical agentic
+        /// loop into one invocation: gaffer runs the affected-tests
+        /// strategy stack, scopes the runner to just those test files,
+        /// and parses results as usual. The trailing `-- <cmd>` is
+        /// ignored when `--affected` is set.
+        #[arg(long)]
+        affected: bool,
+
+        /// Changed source files. Only meaningful with `--affected`.
+        #[arg(long = "files", num_args = 1.., requires = "affected")]
+        files: Vec<String>,
+
+        /// With `--affected`, disable the static import-graph strategy and
+        /// fall back to naming + directory proximity heuristics only. Same
+        /// semantics as `gaffer affected-tests --no-graph`.
+        #[arg(long = "no-graph", requires = "affected")]
+        no_graph: bool,
+
+        /// With `--affected`, force an in-memory graph build instead of
+        /// using the SQLite cache. Same semantics as
+        /// `gaffer affected-tests --no-cache`.
+        #[arg(long = "no-cache", requires = "affected")]
+        no_cache: bool,
+
+        /// What to do when `--affected` finds no affected tests:
+        /// `auto` (default — exit 0 if all signals were available, exit
+        /// non-zero if some were unavailable so callers don't silently
+        /// green-light a degraded run),
+        /// `skip` (always exit 0),
+        /// `fail` (always exit non-zero).
+        /// Only meaningful with `--affected`.
+        #[arg(long = "on-empty", value_enum, default_value_t = OnEmpty::Auto, requires = "affected")]
+        on_empty: OnEmpty,
+
+        /// The test command to run (everything after --). Optional when
+        /// `--affected` is set; required otherwise.
+        #[arg(trailing_var_arg = true)]
         command: Vec<String>,
     },
 
@@ -104,7 +163,7 @@ enum Commands {
         #[arg(required = true)]
         paths: Vec<PathBuf>,
 
-        /// Upload token (gfr_…). Falls back to GAFFER_UPLOAD_TOKEN, then GAFFER_TOKEN.
+        /// Project token (gfr_…). Falls back to GAFFER_PROJECT_TOKEN, then GAFFER_UPLOAD_TOKEN, then GAFFER_TOKEN.
         #[arg(long)]
         token: Option<String>,
 
@@ -181,26 +240,40 @@ enum Commands {
         #[arg(long)]
         data_dir: Option<PathBuf>,
 
-        /// Output format: human or json
+        /// Output format: json (default, machine-readable to stdout) or human.
+        /// Use --pretty for the human-readable form without spelling out the enum.
         #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
         format: OutputFormat,
 
-        /// Also use static import-graph reverse-reachability. First call
-        /// builds the graph by walking the project; subsequent calls
-        /// incrementally update only files whose mtime has changed,
-        /// persisted to `<project>/.gaffer/graph.db`. Finds tests the
-        /// heuristic misses, especially in monorepos where tests live
-        /// in dedicated directories.
-        #[arg(long)]
-        graph: bool,
+        /// Human-readable output to stderr instead of JSON. Equivalent to
+        /// `--format human`.
+        #[arg(long, conflicts_with = "format")]
+        pretty: bool,
 
-        /// With `--graph`, force an in-memory build instead of using the
-        /// SQLite cache at `.gaffer/graph.db`. Useful for ephemeral CI
-        /// runs and read-only filesystems. Cache failures already fall
-        /// back to in-memory automatically; this flag silences the
-        /// fallback warning.
+        /// Disable the static import-graph reverse-reachability strategy.
+        /// By default the graph runs: first call walks the project and
+        /// caches at `<project>/.gaffer/graph.db`; subsequent calls
+        /// incrementally update only files whose mtime has changed.
+        /// `--no-graph` falls back to naming + directory proximity heuristics
+        /// only — faster on huge codebases where the graph build is
+        /// dominant, at the cost of missing indirect dependencies.
+        #[arg(long = "no-graph")]
+        no_graph: bool,
+
+        /// Force an in-memory graph build instead of using the SQLite
+        /// cache. Useful for ephemeral CI runs and read-only filesystems.
+        /// Cache failures already fall back to in-memory automatically;
+        /// this flag silences the fallback warning.
         #[arg(long)]
         no_cache: bool,
+
+        /// Print only the bare `run_command` string to stdout (no JSON
+        /// wrapping). Exit 1 if no command is available so
+        /// `gaffer test -- $(gaffer affected-tests ... --print-cmd)`
+        /// fails fast on the empty case instead of running gaffer-test
+        /// with no wrapped command.
+        #[arg(long = "print-cmd")]
+        print_cmd: bool,
     },
 
     /// Diagnose common setup issues
@@ -310,6 +383,11 @@ fn main() {
             show_errors,
             compare,
             fail_on,
+            affected,
+            files,
+            no_graph,
+            no_cache,
+            on_empty,
             command,
         } => {
             let project_root = resolve_data_dir(data_dir.as_ref());
@@ -320,7 +398,60 @@ fn main() {
                 &project_root,
                 config.as_deref(),
             );
-            match commands::test::run(&config, &command, &reports, &format, show_errors, compare.as_deref(), fail_on.as_ref()) {
+
+            // Resolve the wrapped command. With `--affected`, derive it from affected-tests;
+            // otherwise require a trailing `-- <cmd>`.
+            let resolved_command = if affected {
+                if files.is_empty() {
+                    eprintln!("[gaffer] --affected requires --files <path> [<path>...]");
+                    process::exit(1);
+                }
+                let (result, argv) = commands::affected_tests::compute_with_argv(
+                    &project_root,
+                    &files,
+                    /* graph */ !no_graph,
+                    no_cache,
+                );
+                match argv {
+                    Some(argv) => {
+                        eprintln!(
+                            "[gaffer] --affected selected {} test file(s); running: {}",
+                            result.affected.len(),
+                            result.run_command.as_deref().unwrap_or("")
+                        );
+                        argv
+                    }
+                    None => {
+                        let degraded = !result.signals.unavailable.is_empty();
+                        if degraded {
+                            eprintln!(
+                                "[gaffer] --affected: no affected tests, but signals were unavailable ({}). \
+                                 Consider escalating scope.",
+                                result.signals.unavailable.join(", ")
+                            );
+                        } else {
+                            eprintln!("[gaffer] --affected: no affected tests for the given files.");
+                        }
+                        let should_fail = match on_empty {
+                            OnEmpty::Auto => degraded,
+                            OnEmpty::Skip => false,
+                            OnEmpty::Fail => true,
+                        };
+                        process::exit(if should_fail { 1 } else { 0 });
+                    }
+                }
+            } else {
+                if command.is_empty() {
+                    eprintln!(
+                        "[gaffer] No command provided. Usage: gaffer test -- <command>\n\
+                         (or: gaffer test --affected --files <changed-files>)"
+                    );
+                    process::exit(1);
+                }
+                command
+            };
+
+            match commands::test::run(&config, &resolved_command, &reports, &format, show_errors, compare.as_deref(), fail_on.as_ref()) {
                 Ok(exit_code) => process::exit(exit_code),
                 Err(e) => {
                     eprintln!("[gaffer] Error: {:#}", e);
@@ -377,15 +508,26 @@ fn main() {
             files,
             data_dir,
             format,
-            graph,
+            pretty,
+            no_graph,
             no_cache,
+            print_cmd,
         } => {
             let project_root = resolve_data_dir(data_dir.as_ref());
-            if let Err(e) =
-                commands::affected_tests::run(&project_root, &files, &format, graph, no_cache)
-            {
-                eprintln!("[gaffer] Error: {:#}", e);
-                process::exit(1);
+            let effective_format = if pretty { OutputFormat::Human } else { format };
+            match commands::affected_tests::run(
+                &project_root,
+                &files,
+                &effective_format,
+                /* graph */ !no_graph,
+                no_cache,
+                print_cmd,
+            ) {
+                Ok(code) => process::exit(code),
+                Err(e) => {
+                    eprintln!("[gaffer] Error: {:#}", e);
+                    process::exit(1);
+                }
             }
         }
         Commands::Doctor {

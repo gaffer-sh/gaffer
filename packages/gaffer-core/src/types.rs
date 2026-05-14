@@ -271,17 +271,60 @@ pub struct CoverageDelta {
 // Affected tests types
 // =============================================================================
 
+/// A single signal that selected a test as affected. One test can be selected
+/// by multiple signals; downstream callers use `signals` (plural) on
+/// `AffectedTest` to reason about confidence intelligently — e.g., "naming
+/// convention + import graph" is much stronger than "directory proximity
+/// alone." Kept distinct from `AffectedTest` itself so the per-test combined
+/// confidence (via noisy-OR) and the per-signal contributions don't get
+/// conflated.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct AffectedTestSignal {
+    /// Signal name. Stable strings: `naming_convention`, `directory_proximity`,
+    /// `import_graph`, `rust_inline_tests`, `coverage_history`, `failure_history`.
+    /// History-derived signals are only present when an
+    /// [`crate::affected::HistorySignalProvider`] returns data.
+    pub strategy: String,
+    /// Per-signal confidence (0.0-1.0). Independent of other signals'
+    /// confidences; combined via noisy-OR into the parent `AffectedTest.confidence`.
+    pub confidence: f64,
+}
+
 /// A test file that may be affected by a source file change.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AffectedTest {
     /// Path to the test file (relative to project root)
     pub test_file: String,
-    /// Confidence score (0.0-1.0)
+    /// Combined confidence across all contributing signals (noisy-OR of `signals`).
     pub confidence: f64,
-    /// Strategy that found this match
+    /// Strategy name of the highest-individual-confidence signal. Kept as a
+    /// flat string for backwards compatibility with existing JSON consumers;
+    /// new code should prefer `signals` which carries the full list.
     pub strategy: String,
     /// Source file that triggered this match
     pub source_file: String,
+    /// All signals that selected this test, with their per-signal confidence.
+    /// Empty in legacy payloads; populated by current `affected::find_*` calls.
+    /// Serialized as a JSON array, omitted entirely when empty so legacy
+    /// consumers see the same shape they always have.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub signals: Vec<AffectedTestSignal>,
+}
+
+/// Which signal sources were attempted on this run. Lets callers (humans
+/// and coding agents) tell at a glance whether a `coverage_history` /
+/// `failure_history` signal *was unavailable* vs *was available and found
+/// no match*. Without this, an empty `affected` list is indistinguishable
+/// from a degraded-mode run with no history connection.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct AffectedTestsSignalCoverage {
+    /// Signal names that ran on this query.
+    pub attempted: Vec<String>,
+    /// Signal names that were skipped because their data source was
+    /// unavailable (e.g. no Gaffer connection, no local graph cache).
+    /// Populated alongside `attempted` so the caller knows what would
+    /// have been included given the right configuration.
+    pub unavailable: Vec<String>,
 }
 
 /// Result of affected-tests analysis.
@@ -292,6 +335,11 @@ pub struct AffectedTestsResult {
     pub run_command: Option<String>,
     /// Detected framework name
     pub framework: Option<String>,
+    /// Which signal sources were attempted / unavailable on this run.
+    /// Defaults to empty for legacy callers / call sites that haven't yet
+    /// been updated to thread signal-coverage through.
+    #[serde(default)]
+    pub signals: AffectedTestsSignalCoverage,
 }
 
 // =============================================================================
