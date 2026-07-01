@@ -490,6 +490,50 @@ fn build_http_client(timeout_secs: u64) -> UploadResult<Client> {
 
 // ----- Small bundle path ---------------------------------------------------
 
+/// Infer a Content-Type from a file path's extension.
+///
+/// Mirrors the dashboard's `getMimeType` table
+/// (`apps/dashboard/server/utils/mime-types.ts`) so the small-bundle multipart
+/// upload stores the same accurate type the server infers for the MPU path.
+/// Sending `application/octet-stream` for everything made hosted reports
+/// download instead of render inline. Keep this table in parity with
+/// mime-types.ts. Unknown/missing extensions fall back to octet-stream, which
+/// the server then re-infers defensively at upload time.
+fn content_type_for(path: &str) -> &'static str {
+    let ext = Path::new(path)
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(str::to_ascii_lowercase);
+    match ext.as_deref() {
+        Some("html" | "htm") => "text/html",
+        Some("xml" | "trx") => "application/xml",
+        Some("json") => "application/json",
+        Some("css") => "text/css",
+        Some("js" | "mjs") => "application/javascript",
+        Some("svg") => "image/svg+xml",
+        Some("png") => "image/png",
+        Some("jpg" | "jpeg") => "image/jpeg",
+        Some("gif") => "image/gif",
+        Some("ico") => "image/x-icon",
+        Some("webp") => "image/webp",
+        // Video — Playwright/Vitest embed failure videos in HTML reports.
+        Some("webm") => "video/webm",
+        Some("mp4") => "video/mp4",
+        Some("woff") => "font/woff",
+        Some("woff2") => "font/woff2",
+        Some("ttf") => "font/ttf",
+        Some("eot") => "application/vnd.ms-fontobject",
+        Some("gz") => "application/gzip",
+        Some("zip") => "application/zip",
+        Some("tar") => "application/x-tar",
+        Some("txt" | "lcov" | "info") => "text/plain",
+        Some("md") => "text/markdown",
+        Some("csv") => "text/csv",
+        Some("webmanifest") => "application/manifest+json",
+        _ => "application/octet-stream",
+    }
+}
+
 async fn upload_small_bundle(
     client: &Client,
     config: &UploadConfig,
@@ -509,7 +553,7 @@ async fn upload_small_bundle(
             })?;
             let part = multipart::Part::bytes(bytes)
                 .file_name(f.relative_path.clone())
-                .mime_str("application/octet-stream")
+                .mime_str(content_type_for(&f.relative_path))
                 .map_err(|e| UploadError::unexpected("mime", e.to_string()))?;
             form = form.part("files", part);
         }
@@ -1051,6 +1095,42 @@ mod tests {
             max_file_size_mb: 100,
             debug: false,
         }
+    }
+
+    #[test]
+    fn content_type_for_infers_report_types() {
+        assert_eq!(content_type_for("index.html"), "text/html");
+        assert_eq!(content_type_for("report.htm"), "text/html");
+        assert_eq!(content_type_for("junit.xml"), "application/xml");
+        assert_eq!(content_type_for("results.trx"), "application/xml");
+        assert_eq!(content_type_for("data.json"), "application/json");
+        assert_eq!(content_type_for("lcov.info"), "text/plain");
+    }
+
+    #[test]
+    fn content_type_for_infers_html_report_assets() {
+        // Playwright/Vitest HTML reports ship a tree of assets that must each
+        // serve with the right type for the report to render.
+        assert_eq!(content_type_for("assets/index-X8b7Z_4p.css"), "text/css");
+        assert_eq!(content_type_for("assets/index-D_ryMEPs.js"), "application/javascript");
+        assert_eq!(content_type_for("trace/screenshot.png"), "image/png");
+        assert_eq!(content_type_for("fonts/codicon.woff2"), "font/woff2");
+        // Embedded failure videos must serve as video/* so the report's
+        // <video> element plays instead of downloading.
+        assert_eq!(content_type_for("data/retry1-video.webm"), "video/webm");
+        assert_eq!(content_type_for("site.webmanifest"), "application/manifest+json");
+    }
+
+    #[test]
+    fn content_type_for_is_case_insensitive_and_uses_last_extension() {
+        assert_eq!(content_type_for("REPORT.HTML"), "text/html");
+        assert_eq!(content_type_for("html.meta.json.gz"), "application/gzip");
+    }
+
+    #[test]
+    fn content_type_for_falls_back_to_octet_stream() {
+        assert_eq!(content_type_for("trace.bin"), "application/octet-stream");
+        assert_eq!(content_type_for("Makefile"), "application/octet-stream");
     }
 
     #[test]
