@@ -6,7 +6,7 @@ fn load_fixture(name: &str) -> String {
         env!("CARGO_MANIFEST_DIR"),
         name
     );
-    std::fs::read_to_string(&path).expect(&format!("Failed to read fixture: {}", path))
+    std::fs::read_to_string(&path).unwrap_or_else(|_| panic!("Failed to read fixture: {}", path))
 }
 
 fn parse_via_registry(content: &str, filename: &str) -> serde_json::Value {

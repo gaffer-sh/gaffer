@@ -62,6 +62,11 @@ pub struct Database {
     conn: Connection,
 }
 
+/// `(branch, commit_sha, ci_provider, framework, started_at, finished_at)` as stored
+/// on `test_runs`. Named so the signature is readable; the underlying shape still
+/// wants to be a struct, which is a bigger change than adding a lint.
+type RunMetadataRow = (Option<String>, Option<String>, Option<String>, String, String, Option<String>);
+
 impl Database {
     /// Open or create the SQLite database at the given path.
     /// Creates parent directories if they don't exist (e.g. `.gaffer/`).
@@ -423,7 +428,7 @@ impl Database {
     pub fn get_run_metadata(
         &self,
         run_id: &str,
-    ) -> Result<(Option<String>, Option<String>, Option<String>, String, String, Option<String>), rusqlite::Error> {
+    ) -> Result<RunMetadataRow, rusqlite::Error> {
         self.conn.query_row(
             "SELECT branch, commit_sha, ci_provider, framework, started_at, finished_at
              FROM test_runs WHERE id = ?1",
@@ -805,12 +810,9 @@ mod tests {
         }
     }
 
-    /// Helper to read a full row from test_runs for detailed assertions.
-    /// Returns (status, total, passed, failed, skipped, duration_ms, finished_at, branch, commit_sha).
-    fn get_run_row(
-        db: &Database,
-        run_id: &str,
-    ) -> (
+    /// `(status, total, passed, failed, skipped, duration_ms, finished_at, branch,
+    /// commit_sha)` — assertion-only shape for the tests below.
+    type TestRunRow = (
         String,
         Option<i32>,
         Option<i32>,
@@ -820,7 +822,14 @@ mod tests {
         Option<String>,
         Option<String>,
         Option<String>,
-    ) {
+    );
+
+    /// Helper to read a full row from test_runs for detailed assertions.
+    /// Returns (status, total, passed, failed, skipped, duration_ms, finished_at, branch, commit_sha).
+    fn get_run_row(
+        db: &Database,
+        run_id: &str,
+    ) -> TestRunRow {
         db.conn
             .query_row(
                 "SELECT status, total, passed, failed, skipped, duration_ms, finished_at, branch, commit_sha

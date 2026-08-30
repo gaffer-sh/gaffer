@@ -2,6 +2,7 @@ pub mod affected_tests;
 pub mod config;
 pub mod doctor;
 pub mod init;
+pub mod login;
 pub mod query;
 pub mod sync;
 pub mod test;

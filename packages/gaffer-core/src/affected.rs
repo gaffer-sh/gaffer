@@ -308,9 +308,9 @@ pub fn find_affected_tests_with_history(
     }
 }
 
-/// Strategies 1, 2, 4: heuristic naming-convention + directory-proximity
-/// + Rust inline self-test. All cheap and per-file; the cached and
-/// in-memory variants share this step.
+/// Strategies 1, 2, 4: heuristic naming-convention, directory-proximity and
+/// Rust inline self-test. All cheap and per-file; the cached and in-memory
+/// variants share this step.
 fn apply_per_file_strategies(
     project_root: &Path,
     changed_files: &[String],
@@ -380,9 +380,7 @@ fn apply_graph_strategy(
 /// Combine per-test observations via noisy-OR, sort by combined
 /// confidence, cap at `RESULT_CAP`. Final stage shared across variants.
 fn compose_results(hits: HashMap<String, Vec<AffectedTest>>) -> Vec<AffectedTest> {
-    let mut combined: Vec<AffectedTest> = hits
-        .into_iter()
-        .map(|(_, observations)| combine_noisy_or(observations))
+    let mut combined: Vec<AffectedTest> = hits.into_values().map(combine_noisy_or)
         .collect();
     combined.sort_by(|a, b| {
         b.confidence
@@ -917,6 +915,10 @@ mod tests {
             );
             self
         }
+        // Symmetric counterpart of `with_coverage`. No test exercises the
+        // failure-history path yet; kept so the stub mirrors the two-signal
+        // shape of HistorySignalProvider rather than documenting only half of it.
+        #[allow(dead_code)]
         fn with_failure(mut self, src: &str, tests: Vec<&str>) -> Self {
             self.failure.insert(
                 src.to_string(),

@@ -330,7 +330,7 @@ pub fn print_comparison(comparison: &ComparisonResult) {
 
     let mut stats = Vec::new();
     if new_count > 0 {
-        stats.push(format!("{}", plural(new_count, "new failure")).red().to_string());
+        stats.push(plural(new_count, "new failure").to_string().red().to_string());
     }
     if fixed_count > 0 {
         stats.push(format!("{} fixed", fixed_count).green().to_string());

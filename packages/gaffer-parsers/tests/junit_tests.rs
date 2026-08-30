@@ -15,7 +15,7 @@ fn load_fixture(name: &str) -> String {
         env!("CARGO_MANIFEST_DIR"),
         name
     );
-    std::fs::read_to_string(&path).expect(&format!("Failed to read fixture: {}", path))
+    std::fs::read_to_string(&path).unwrap_or_else(|_| panic!("Failed to read fixture: {}", path))
 }
 
 fn load_fixture_bytes(name: &str) -> Vec<u8> {
@@ -24,7 +24,7 @@ fn load_fixture_bytes(name: &str) -> Vec<u8> {
         env!("CARGO_MANIFEST_DIR"),
         name
     );
-    std::fs::read(&path).expect(&format!("Failed to read fixture: {}", path))
+    std::fs::read(&path).unwrap_or_else(|_| panic!("Failed to read fixture: {}", path))
 }
 
 // ============================================================================
@@ -395,4 +395,17 @@ fn test_suite_file_inherited_by_testcase() {
     // All testcases in single-suite.xml have explicit @file, but the suite also has @file
     // The testcase's own @file takes priority
     assert_eq!(report["testCases"][0]["filePath"], "tests/single.spec.ts");
+}
+
+#[test]
+fn test_junit_has_no_wall_clock_start_times() {
+    // JUnit XML carries no per-test start time. The field must stay absent
+    // rather than being filled with a plausible-looking substitute.
+    let xml = load_fixture("valid-report.xml");
+    let report = parse_and_check(&xml);
+
+    for tc in report["testCases"].as_array().unwrap() {
+        assert!(tc.get("startedAt").is_none());
+        assert!(tc.get("workerIndex").is_none());
+    }
 }

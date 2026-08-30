@@ -504,7 +504,7 @@ mod tests {
         }
 
         let result = detect_flaky_tests(&history);
-        assert!(result.len() >= 1);
+        assert!(!result.is_empty());
         if result.len() >= 2 {
             assert!(result[0].composite_score >= result[1].composite_score);
         }

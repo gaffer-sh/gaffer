@@ -6,6 +6,50 @@ members = [
   "packages/cli",
 ]
 
+# Workspace-wide lint policy. Each member opts in with `[lints] workspace = true`;
+# Cargo has no implicit inheritance, so a crate missing that stanza is unlinted.
+#
+# CI runs `cargo clippy --workspace --all-targets -- -D warnings`, which promotes
+# every "warn" below to a hard failure at the merge gate while leaving local
+# `cargo build` usable. That is the intended split: warn locally, deny to merge.
+#
+# NOT enabled: clippy::unwrap_used / expect_used. `.claude/rules/rust.md` says "no
+# .unwrap() or panic! in library code", but mechanically that lint fires on 26
+# library sites here and every one is justified — LazyLock<Regex> over literal
+# patterns, built-in parser registration, and mutex locks. Requiring an #[allow]
+# on each would add noise and teach people to reach for #[allow] reflexively. The
+# rule stays prose until there is a lint that distinguishes a fallible runtime
+# unwrap from a compile-time-constant one.
+[workspace.lints.rust]
+unused_must_use = "deny"
+unused_lifetimes = "warn"
+# NOT enabled: unreachable_pub. Measured at 79 violations, 66 of them in
+# packages/cli — a binary crate, where `pub` carries no meaning in Rust's
+# visibility graph and `pub(crate)` everywhere would be pure churn. The other 13
+# are in the two WASM crates, where `pub` marks the wasm-bindgen export surface
+# rather than a Rust re-export. The lint is measuring the wrong thing here.
+# `warn`, not `forbid`: wasm-bindgen expands to unsafe blocks inside gaffer-parsers
+# and gaffer-render. Measured at 0 today because the lint does not fire on external
+# macro expansions, but `forbid` cannot be locally overridden if that ever changes.
+unsafe_code = "warn"
+
+[workspace.lints.clippy]
+# The default clippy set promoted from warn to deny. This is what turned the 34
+# pre-existing warnings into a one-time cleanup rather than permanent background
+# noise. `priority = -1` is required: when a group and individual lints share a
+# table, Cargo needs the group ordered first or the individual entries lose.
+all = { level = "deny", priority = -1 }
+
+# Cheap, high-signal additions beyond `all`. All measured at 0 violations.
+dbg_macro = "deny"
+todo = "warn"
+unimplemented = "warn"
+
+# `gaffer` is a CLI: stdout is its product, and the MCP-adjacent paths use stderr
+# deliberately. These would fire on correct code.
+print_stdout = "allow"
+print_stderr = "allow"
+
 [profile.release]
 lto = true
 codegen-units = 1

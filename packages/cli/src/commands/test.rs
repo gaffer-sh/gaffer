@@ -211,7 +211,7 @@ pub fn run(config: &Config, command: &[String], explicit_reports: &[String], for
     let classify_start = std::time::Instant::now();
     let baseline_branch = compare
         .map(|s| s.to_string())
-        .or_else(|| git::detect_default_branch());
+        .or_else(git::detect_default_branch);
     let classification = core.classify_failures(
         &run_id,
         baseline_branch.as_deref(),

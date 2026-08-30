@@ -123,11 +123,10 @@ impl ImportExtractor for GoExtractor {
         // module `myapp` if no longer module also matches (`myapp/foo`).
         let mut best: Option<(&String, &PathBuf)> = None;
         for (mod_path, mod_dir) in &index {
-            if specifier == mod_path || specifier.starts_with(&format!("{}/", mod_path)) {
-                if best.map(|(b, _)| b.len()).unwrap_or(0) < mod_path.len() {
+            if (specifier == mod_path || specifier.starts_with(&format!("{}/", mod_path)))
+                && best.map(|(b, _)| b.len()).unwrap_or(0) < mod_path.len() {
                     best = Some((mod_path, mod_dir));
                 }
-            }
         }
         let (mod_path, mod_dir) = match best {
             Some(b) => b,

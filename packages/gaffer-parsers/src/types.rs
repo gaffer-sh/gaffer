@@ -39,6 +39,14 @@ pub struct TestCase {
     pub line: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub retry_attempt: Option<u32>,
+    /// Wall-clock start of the test, RFC3339. Only formats that record it
+    /// (currently Playwright JSON) populate this; everything else leaves it
+    /// None rather than guessing.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub started_at: Option<String>,
+    /// Index of the parallel worker that ran the test, when the format reports it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub worker_index: Option<u32>,
 }
 
 #[derive(Debug, Serialize, PartialEq)]

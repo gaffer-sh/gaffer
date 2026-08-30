@@ -26,6 +26,8 @@ use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 
+use crate::oidc;
+
 /// Where a config value came from, in priority order.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ConfigSource {
@@ -34,6 +36,10 @@ pub enum ConfigSource {
     ExplicitConfig,
     LocalConfig,
     GlobalConfig,
+    /// Token only: no explicit token was configured anywhere, so it was
+    /// obtained by exchanging the GitHub Actions runner's OIDC identity
+    /// token (see `oidc::try_exchange`).
+    Oidc,
     Default,
 }
 
@@ -45,6 +51,7 @@ impl std::fmt::Display for ConfigSource {
             ConfigSource::ExplicitConfig => write!(f, "explicit config"),
             ConfigSource::LocalConfig => write!(f, "local config"),
             ConfigSource::GlobalConfig => write!(f, "global config"),
+            ConfigSource::Oidc => write!(f, "GitHub Actions OIDC"),
             ConfigSource::Default => write!(f, "default"),
         }
     }
@@ -144,7 +151,7 @@ impl Config {
         explicit_config: Option<&Path>,
     ) -> Self {
         // Load explicit config if provided
-        let explicit = explicit_config.and_then(|path| load_explicit_config(path));
+        let explicit = explicit_config.and_then(load_explicit_config);
 
         // Load local + global config layers
         let (local_result, checked_paths) = find_local_config(start_dir);
@@ -164,16 +171,9 @@ impl Config {
 
         let local_config = local_result.map(|(cfg, _)| cfg);
 
-        // Token: CLI > env > explicit > local > global
-        let (token, token_source) = resolve_field_5(
-            cli_token.map(|s| s.to_string()),
-            || std::env::var("GAFFER_TOKEN").ok(),
-            || explicit.as_ref().and_then(|c| c.project.as_ref().and_then(|p| p.token.clone())),
-            || local_config.as_ref().and_then(|c| c.project.as_ref().and_then(|p| p.token.clone())),
-            || global.as_ref().and_then(|c| c.project.as_ref().and_then(|p| p.token.clone())),
-        );
-
-        // API URL: CLI > env > explicit > local > global
+        // API URL: CLI > env > explicit > local > global. Resolved before the
+        // token so a resolved custom endpoint can be used as the OIDC
+        // exchange origin below.
         let (api_url, api_url_source) = resolve_field_5(
             cli_api_url.map(|s| s.to_string()),
             || std::env::var("GAFFER_API_URL").ok(),
@@ -181,6 +181,39 @@ impl Config {
             || local_config.as_ref().and_then(|c| c.project.as_ref().and_then(|p| p.api_url.clone())),
             || global.as_ref().and_then(|c| c.project.as_ref().and_then(|p| p.api_url.clone())),
         );
+
+        // Token: CLI > env > explicit > local > global > GitHub Actions OIDC.
+        // `gaffer upload` reaches the same OIDC fallback through its own
+        // `resolve_token` (commands/upload.rs); both bottom out in
+        // `oidc::try_exchange`, so `gaffer test`/`sync`/`doctor` (all of
+        // which resolve their token through here) get identical behavior.
+        let (token, token_source) = resolve_field_5(
+            cli_token.map(|s| s.to_string()),
+            || std::env::var("GAFFER_TOKEN").ok(),
+            || explicit.as_ref().and_then(|c| c.project.as_ref().and_then(|p| p.token.clone())),
+            || local_config.as_ref().and_then(|c| c.project.as_ref().and_then(|p| p.token.clone())),
+            || global.as_ref().and_then(|c| c.project.as_ref().and_then(|p| p.token.clone())),
+        );
+        let (token, token_source) = if token.is_none() {
+            match oidc::try_exchange(api_url.as_deref()) {
+                Some(Ok(exchanged)) => {
+                    oidc::print_auth_success(&exchanged);
+                    (Some(exchanged.access_token), ConfigSource::Oidc)
+                }
+                Some(Err(e)) => {
+                    eprintln!(
+                        "[gaffer] Warning: GitHub Actions OIDC token exchange failed: {}. \
+                         Pass --token, set GAFFER_TOKEN, or check that this job was granted \
+                         `permissions: id-token: write`.",
+                        e
+                    );
+                    (token, token_source)
+                }
+                None => (token, token_source),
+            }
+        } else {
+            (token, token_source)
+        };
 
         // Report patterns: CLI > explicit > local > defaults (global never provides patterns)
         let (report_patterns, patterns_source) = if !cli_reports.is_empty() {
@@ -274,8 +307,12 @@ fn load_explicit_config(path: &Path) -> Option<TomlConfig> {
 
 /// Walk up from `start_dir` looking for `.gaffer/config.toml` or `gaffer.toml`.
 ///
+/// `(found config and its project root, every path probed and whether it existed)`.
+/// The probe list feeds `gaffer config` / `gaffer doctor`, which show the search path.
+type LocalConfigLookup = (Option<(TomlConfig, PathBuf)>, Vec<(PathBuf, bool)>);
+
 /// Returns the parsed config + project root if found, plus all paths checked.
-fn find_local_config(start_dir: &Path) -> (Option<(TomlConfig, PathBuf)>, Vec<(PathBuf, bool)>) {
+fn find_local_config(start_dir: &Path) -> LocalConfigLookup {
     let mut dir = start_dir.to_path_buf();
     let mut checked = Vec::new();
 
@@ -458,8 +495,11 @@ mod tests {
     use tempfile::TempDir;
 
     // Tests that modify env vars must be serialized to avoid race conditions.
-    use std::sync::Mutex;
-    static ENV_MUTEX: Mutex<()> = Mutex::new(());
+    // Any test here that calls `Config::resolve` with no token configured
+    // reaches `oidc::try_exchange`, which reads process-wide env vars the
+    // oidc/upload test suites also mutate, so this reuses their mutex
+    // rather than defining a separate one that wouldn't serialize against it.
+    use crate::oidc::ENV_MUTEX;
 
     // --- global_config_dir tests ---
 
@@ -684,6 +724,15 @@ mod tests {
     #[test]
     fn resolve_defaults_when_no_config() {
         let _lock = ENV_MUTEX.lock().unwrap();
+        // Clear the OIDC env vars too. A real GitHub Actions runner sets
+        // these ambiently, and if present they'd send this test down the
+        // OIDC exchange path (a real network call) instead of the "no
+        // token" default this test is asserting.
+        let original_request_url = std::env::var("ACTIONS_ID_TOKEN_REQUEST_URL").ok();
+        let original_request_token = std::env::var("ACTIONS_ID_TOKEN_REQUEST_TOKEN").ok();
+        std::env::remove_var("ACTIONS_ID_TOKEN_REQUEST_URL");
+        std::env::remove_var("ACTIONS_ID_TOKEN_REQUEST_TOKEN");
+
         let tmp = TempDir::new().unwrap();
         // Ensure no global config interferes
         let original_xdg = std::env::var("XDG_CONFIG_HOME").ok();
@@ -696,6 +745,14 @@ mod tests {
             Some(v) => std::env::set_var("XDG_CONFIG_HOME", v),
             None => std::env::remove_var("XDG_CONFIG_HOME"),
         }
+        match original_request_url {
+            Some(v) => std::env::set_var("ACTIONS_ID_TOKEN_REQUEST_URL", v),
+            None => std::env::remove_var("ACTIONS_ID_TOKEN_REQUEST_URL"),
+        }
+        match original_request_token {
+            Some(v) => std::env::set_var("ACTIONS_ID_TOKEN_REQUEST_TOKEN", v),
+            None => std::env::remove_var("ACTIONS_ID_TOKEN_REQUEST_TOKEN"),
+        }
 
         assert!(config.token.is_none());
         assert_eq!(config.sources.token, ConfigSource::Default);
@@ -705,6 +762,9 @@ mod tests {
 
     #[test]
     fn resolve_project_root_from_local_config() {
+        // No token anywhere in this config, so resolution reaches the OIDC
+        // fallback; serialize against oidc/upload's env var mutation.
+        let _lock = ENV_MUTEX.lock().unwrap();
         let tmp = TempDir::new().unwrap();
         let gaffer_dir = tmp.path().join(".gaffer");
         fs::create_dir_all(&gaffer_dir).unwrap();

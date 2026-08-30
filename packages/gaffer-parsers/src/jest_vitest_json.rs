@@ -77,6 +77,8 @@ impl Parser for JestVitestParser {
                     file_path: Some(file_path.clone()),
                     line: assertion.location.as_ref().map(|l| l.line),
                     retry_attempt: None,
+                    started_at: None,
+                    worker_index: None,
                 });
             }
         }

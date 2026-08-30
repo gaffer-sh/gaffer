@@ -364,13 +364,12 @@ fn handle_counter_start(
         JacocoState::InClass => {
             class_counters.add_counter(&counter_type, missed, covered);
         }
-        JacocoState::Root => {
+        JacocoState::Root
             // Only capture counters that are direct children of <report>
-            if depth == report_depth + 1 {
+            if depth == report_depth + 1 => {
                 report_counters.add_counter(&counter_type, missed, covered);
                 *has_report_counters = true;
             }
-        }
         _ => {}
     }
 }

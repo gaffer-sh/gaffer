@@ -4,6 +4,7 @@
 //!   gaffer test -- pnpm test
 //!   gaffer test --config path/to/config.toml -- pnpm test
 //!   gaffer sync
+//!   gaffer login
 //!   gaffer init [--global]
 //!   gaffer config list
 
@@ -12,6 +13,9 @@ mod config;
 mod discovery;
 mod framework;
 mod git;
+#[cfg(test)]
+mod http_mock;
+mod oidc;
 mod output;
 
 use std::path::PathBuf;
@@ -68,7 +72,9 @@ struct Cli {
 enum Commands {
     /// Run a test command and analyze results
     Test {
-        /// Authentication token (overrides GAFFER_TOKEN env var and config files)
+        /// Authentication token (overrides GAFFER_TOKEN env var and config files).
+        /// On GitHub Actions with no token configured, falls back to exchanging
+        /// the runner's OIDC identity token (grant `permissions: id-token: write`).
         #[arg(long)]
         token: Option<String>,
 
@@ -154,6 +160,10 @@ enum Commands {
     /// Limits: per-file ceiling is 5 GB (raise --max-file-size-mb to 5000).
     /// Multipart elevation above 90 MB is automatic — no extra flag needed.
     ///
+    /// Auth: on GitHub Actions with no --token / GAFFER_PROJECT_TOKEN configured,
+    /// falls back to exchanging the runner's OIDC identity token for a project
+    /// token (grant `permissions: id-token: write` to the job).
+    ///
     /// Examples:
     ///   gaffer upload ./test-results --token gfr_...
     ///   gaffer upload report.xml playwright-trace.zip --commit-sha $GITHUB_SHA --branch main
@@ -163,7 +173,8 @@ enum Commands {
         #[arg(required = true)]
         paths: Vec<PathBuf>,
 
-        /// Project token (gfr_…). Falls back to GAFFER_PROJECT_TOKEN, then GAFFER_UPLOAD_TOKEN, then GAFFER_TOKEN.
+        /// Project token (gfr_…). Falls back to GAFFER_PROJECT_TOKEN, then GAFFER_UPLOAD_TOKEN,
+        /// then GAFFER_TOKEN, then (on GitHub Actions) an automatic OIDC token exchange.
         #[arg(long)]
         token: Option<String>,
 
@@ -217,6 +228,24 @@ enum Commands {
         /// Directory for local data storage (default: current directory)
         #[arg(long)]
         data_dir: Option<PathBuf>,
+    },
+
+    /// Authenticate this machine and store the credential in the global config.
+    ///
+    /// Runs the RFC 8628 device authorization flow: prints a short code, opens
+    /// the browser, and waits for you to approve. Requires a deployment that
+    /// serves `/oauth/device_authorization`; on older ones use `gaffer init`,
+    /// which falls back to the previous flow.
+    Login {
+        /// API URL for cloud sync
+        #[arg(long)]
+        api_url: Option<String>,
+
+        /// OAuth scope to request. `upload` mints a project-scoped gfr_ token
+        /// (you pick the project in the browser); `read` mints an
+        /// account-scoped gaf_ API key.
+        #[arg(long, default_value = commands::login::UPLOAD_SCOPE)]
+        scope: String,
     },
 
     /// Interactive setup — detect framework, configure reporters, authenticate
@@ -545,6 +574,12 @@ fn main() {
                 config.as_deref(),
             );
             if let Err(e) = commands::doctor::run(&config) {
+                eprintln!("[gaffer] Error: {:#}", e);
+                process::exit(1);
+            }
+        }
+        Commands::Login { api_url, scope } => {
+            if let Err(e) = commands::login::run(api_url.as_deref(), &scope) {
                 eprintln!("[gaffer] Error: {:#}", e);
                 process::exit(1);
             }

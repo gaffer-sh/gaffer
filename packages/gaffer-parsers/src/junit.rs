@@ -120,6 +120,8 @@ fn finalize_testcase(ctx: TestcaseContext, id: usize, suite_file: Option<&str>) 
         file_path,
         line: ctx.line,
         retry_attempt: None,
+        started_at: None,
+        worker_index: None,
     }
 }
 
@@ -234,12 +236,11 @@ pub fn parse_junit(input: &str) -> Result<ParsedReport, String> {
             Ok(Event::Empty(ref e)) => {
                 let local = e.name().as_ref().to_vec();
                 match local.as_slice() {
-                    b"testsuite" => {
+                    b"testsuite"
                         // Self-closing <testsuite/> — count it but nothing to push/pop
-                        if !has_testsuites_root || suite_depth == 0 {
+                        if (!has_testsuites_root || suite_depth == 0) => {
                             top_level_suite_count += 1;
                         }
-                    }
                     b"testcase" => {
                         let suite_name = suite_stack
                             .last()
@@ -309,9 +310,9 @@ pub fn parse_junit(input: &str) -> Result<ParsedReport, String> {
                         }
                         inside_element = InsideElement::None;
                     }
-                    b"failure" => {
+                    b"failure"
                         // If no @message was found, fall back to text content
-                        if inside_element == InsideElement::Failure {
+                        if inside_element == InsideElement::Failure => {
                             if let Some(ref mut tc) = current_testcase {
                                 if tc.failure_message.is_none() {
                                     let trimmed = tc.text_buf.trim().to_string();
@@ -322,9 +323,8 @@ pub fn parse_junit(input: &str) -> Result<ParsedReport, String> {
                             }
                             inside_element = InsideElement::None;
                         }
-                    }
-                    b"error" => {
-                        if inside_element == InsideElement::Error {
+                    b"error"
+                        if inside_element == InsideElement::Error => {
                             if let Some(ref mut tc) = current_testcase {
                                 if tc.error_message.is_none() {
                                     let trimmed = tc.text_buf.trim().to_string();
@@ -335,28 +335,25 @@ pub fn parse_junit(input: &str) -> Result<ParsedReport, String> {
                             }
                             inside_element = InsideElement::None;
                         }
-                    }
                     _ => {}
                 }
             }
-            Ok(Event::Text(ref e)) => {
-                if inside_element != InsideElement::None {
+            Ok(Event::Text(ref e))
+                if inside_element != InsideElement::None => {
                     if let Some(ref mut tc) = current_testcase {
                         if let Ok(text) = e.unescape() {
                             tc.text_buf.push_str(&text);
                         }
                     }
                 }
-            }
-            Ok(Event::CData(ref e)) => {
-                if inside_element != InsideElement::None {
+            Ok(Event::CData(ref e))
+                if inside_element != InsideElement::None => {
                     if let Some(ref mut tc) = current_testcase {
                         if let Ok(text) = std::str::from_utf8(e.as_ref()) {
                             tc.text_buf.push_str(text);
                         }
                     }
                 }
-            }
             _ => {}
         }
     }

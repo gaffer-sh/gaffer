@@ -127,6 +127,8 @@ fn build_test_case(
         file_path: None,
         line: None,
         retry_attempt: None,
+        started_at: None,
+        worker_index: None,
     }
 }
 
@@ -269,20 +271,18 @@ pub fn parse_trx(input: &str) -> Result<ParsedReport, String> {
                     _ => {}
                 }
             }
-            Ok(Event::Text(ref e)) => {
-                if inside_element != InsideElement::None {
+            Ok(Event::Text(ref e))
+                if inside_element != InsideElement::None => {
                     if let Ok(text) = e.unescape() {
                         text_buf.push_str(&text);
                     }
                 }
-            }
-            Ok(Event::CData(ref e)) => {
-                if inside_element != InsideElement::None {
+            Ok(Event::CData(ref e))
+                if inside_element != InsideElement::None => {
                     if let Ok(text) = std::str::from_utf8(e.as_ref()) {
                         text_buf.push_str(text);
                     }
                 }
-            }
             _ => {}
         }
     }

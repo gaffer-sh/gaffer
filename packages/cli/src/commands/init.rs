@@ -9,6 +9,7 @@ use anyhow::{Context, Result};
 use colored::Colorize;
 use dialoguer::Confirm;
 
+use crate::commands::login::{self, DeviceFlowError};
 use crate::config;
 use crate::framework::{self, Framework, PatchResult};
 
@@ -240,7 +241,32 @@ fn prompt_cloud_connect() -> Result<bool> {
     Ok(connect)
 }
 
+/// Authenticate for `gaffer init`.
+///
+/// The RFC 8628 device flow (GAF-245) is the standard path. A deployment that
+/// predates it has no `/oauth/device_authorization`, and answers 404; that is
+/// the only condition that falls back to the older `/api/v1/cli/*` endpoints,
+/// so a genuine auth failure is still reported rather than silently retried
+/// against a second flow.
 fn authenticate(api_base: &str) -> Result<String> {
+    match login::authenticate(api_base, login::UPLOAD_SCOPE) {
+        Ok(credential) => {
+            println!("  {} Authenticated!", "Done:".green().bold());
+            Ok(credential.access_token)
+        }
+        Err(DeviceFlowError::Unsupported) => {
+            println!(
+                "  {} This deployment predates the device login flow. Using the legacy setup flow.",
+                "Note:".bold()
+            );
+            authenticate_legacy(api_base)
+        }
+        Err(DeviceFlowError::Failed(e)) => Err(e),
+    }
+}
+
+/// Pre-GAF-245 browser flow, kept for deployments without the device endpoint.
+fn authenticate_legacy(api_base: &str) -> Result<String> {
     // 1. Create session
     let setup_url = format!("{}/api/v1/cli/setup", api_base);
     let response = ureq::post(&setup_url)

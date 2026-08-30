@@ -128,9 +128,13 @@ fn collect_test_cases(
 
             let duration_ms = last_result.map(|r| r.duration.max(0.0).round() as u64);
 
-            let error_message = last_result.and_then(|r| extract_error(r));
+            let error_message = last_result.and_then(extract_error);
 
             let retry_attempt = last_result.map(|r| r.retry);
+
+            let started_at = last_result.and_then(|r| r.start_time.clone());
+
+            let worker_index = last_result.and_then(|r| r.worker_index);
 
             test_cases.push(TestCase {
                 id,
@@ -142,6 +146,8 @@ fn collect_test_cases(
                 file_path: Some(spec.file.clone()),
                 line: Some(spec.line),
                 retry_attempt,
+                started_at,
+                worker_index,
             });
         }
     }
@@ -272,6 +278,10 @@ struct PlaywrightTestResult {
     retry: u32,
     #[allow(dead_code)]
     attachments: Vec<serde_json::Value>,
+    #[serde(default)]
+    start_time: Option<String>,
+    #[serde(default)]
+    worker_index: Option<u32>,
 }
 
 #[derive(Deserialize)]

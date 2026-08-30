@@ -6,7 +6,7 @@ fn load_fixture(name: &str) -> String {
         env!("CARGO_MANIFEST_DIR"),
         name
     );
-    std::fs::read_to_string(&path).expect(&format!("Failed to read fixture: {}", path))
+    std::fs::read_to_string(&path).unwrap_or_else(|_| panic!("Failed to read fixture: {}", path))
 }
 
 fn parse_via_registry(content: &str, filename: &str) -> serde_json::Value {
@@ -541,4 +541,46 @@ fn test_global_errors_count() {
     let messages = report["data"]["metadata"]["globalErrors"]["messages"].as_array().unwrap();
     assert_eq!(messages[0], "Global setup failed");
     assert_eq!(messages[1], "Config validation error");
+}
+
+// ============================================================================
+// Wall-clock timestamps (log-correlation foundation)
+// ============================================================================
+
+#[test]
+fn test_playwright_started_at_and_worker_index() {
+    let json = load_fixture("playwright-json-report.json");
+    let report = parse_via_registry(&json, "playwright-results.json");
+
+    let test_cases = report["data"]["testCases"].as_array().unwrap();
+    assert_eq!(test_cases[0]["startedAt"], "2026-02-25T10:00:01.000Z");
+    assert_eq!(test_cases[0]["workerIndex"], 0);
+    assert_eq!(test_cases[1]["startedAt"], "2026-02-25T10:00:01.500Z");
+    assert_eq!(test_cases[1]["workerIndex"], 1);
+}
+
+#[test]
+fn test_playwright_started_at_uses_last_attempt() {
+    let json = load_fixture("playwright-json-report.json");
+    let report = parse_via_registry(&json, "playwright-results.json");
+
+    // spec-3 retried twice; the parser keeps results.last(), so the window
+    // must describe the final attempt, not the first.
+    let test_cases = report["data"]["testCases"].as_array().unwrap();
+    let retried = test_cases.iter().find(|tc| tc["id"] == "spec-3-chromium").unwrap();
+    assert_eq!(retried["startedAt"], "2026-02-25T10:00:16.000Z");
+    assert_eq!(retried["workerIndex"], 3);
+}
+
+#[test]
+fn test_playwright_started_at_absent_when_test_never_ran() {
+    let json = load_fixture("playwright-json-report.json");
+    let report = parse_via_registry(&json, "playwright-results.json");
+
+    // spec-4 is skipped and has no results — no start time to report, and we
+    // must not invent one.
+    let test_cases = report["data"]["testCases"].as_array().unwrap();
+    let skipped = test_cases.iter().find(|tc| tc["id"] == "spec-4-chromium").unwrap();
+    assert!(skipped.get("startedAt").is_none());
+    assert!(skipped.get("workerIndex").is_none());
 }

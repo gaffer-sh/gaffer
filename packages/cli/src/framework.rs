@@ -68,24 +68,28 @@ pub enum PatchResult {
 }
 
 /// Detect all test frameworks in the project directory.
+/// One detection rule: the marker filenames to look for, and the constructor that
+/// turns the matched path into a `Framework`.
+type FrameworkCheck = (&'static [&'static str], Box<dyn Fn(PathBuf) -> Framework>);
+
 pub fn detect_frameworks(project_root: &Path) -> Vec<Framework> {
     let mut frameworks = Vec::new();
 
-    let checks: Vec<(&[&str], Box<dyn Fn(PathBuf) -> Framework>)> = vec![
+    let checks: Vec<FrameworkCheck> = vec![
         // Vitest
         (
             &["vitest.config.ts", "vitest.config.js", "vitest.config.mts", "vitest.config.mjs"],
-            Box::new(|p| Framework::Vitest(p)),
+            Box::new(Framework::Vitest),
         ),
         // Playwright
         (
             &["playwright.config.ts", "playwright.config.js"],
-            Box::new(|p| Framework::Playwright(p)),
+            Box::new(Framework::Playwright),
         ),
         // Jest
         (
             &["jest.config.ts", "jest.config.js", "jest.config.mjs", "jest.config.cjs"],
-            Box::new(|p| Framework::Jest(p)),
+            Box::new(Framework::Jest),
         ),
     ];
 

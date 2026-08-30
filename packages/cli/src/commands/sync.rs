@@ -17,7 +17,10 @@ pub fn run(config: &Config) -> Result<()> {
     .context("Failed to initialize gaffer")?;
 
     if config.token.is_none() {
-        anyhow::bail!("No token configured. Set GAFFER_TOKEN or add token to gaffer.toml");
+        anyhow::bail!(
+            "No token configured. Set GAFFER_TOKEN, add token to gaffer.toml, or on GitHub \
+             Actions grant `permissions: id-token: write` for automatic authentication."
+        );
     }
 
     let result = core.sync().context("Sync failed")?;

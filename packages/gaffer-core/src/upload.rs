@@ -456,7 +456,7 @@ fn over_max_file_error(path: &Path, size: u64, max_mb: u64) -> UploadError {
 /// bundle — this only matters when a project ships many small files whose
 /// cumulative size exceeds `SMALL_BUNDLE_TOTAL_THRESHOLD`.
 fn pack_small_bundles(mut files: Vec<UploadFile>) -> Vec<Vec<UploadFile>> {
-    files.sort_by(|a, b| b.size.cmp(&a.size));
+    files.sort_by_key(|f| std::cmp::Reverse(f.size));
     let mut bundles: Vec<(u64, Vec<UploadFile>)> = Vec::new();
     for f in files {
         let mut placed = false;
@@ -1138,7 +1138,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let file = dir.path().join("report.xml");
         std::fs::write(&file, b"<x/>").unwrap();
-        let files = enumerate_files(&[file.clone()], 100).unwrap();
+        let files = enumerate_files(std::slice::from_ref(&file), 100).unwrap();
         assert_eq!(files.len(), 1);
         assert_eq!(files[0].relative_path, "report.xml");
         assert_eq!(files[0].size, 4);

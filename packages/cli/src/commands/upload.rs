@@ -10,6 +10,8 @@ use std::path::PathBuf;
 
 use gaffer_core::upload::{self, UploadConfig, UploadError, UploadOutcome};
 
+use crate::oidc;
+
 /// CLI flag bag — kebab-case names mirror the v1 GitHub Action input names
 /// 1:1 so the v2 Action wrapper can pass them through without renaming.
 pub struct UploadArgs {
@@ -31,7 +33,9 @@ pub struct UploadArgs {
 /// * `2` — server error (4xx/5xx, network).
 /// * `3` — unexpected (panic in a part task, JSON parse, runtime init).
 pub fn run(args: UploadArgs) -> i32 {
-    let token = match resolve_token(args.token) {
+    let api_url = args.api_url.or_else(|| std::env::var("GAFFER_API_URL").ok());
+
+    let token = match resolve_token(args.token, api_url.as_deref()) {
         Ok(t) => t,
         Err(e) => {
             emit_error(&e);
@@ -41,9 +45,7 @@ pub fn run(args: UploadArgs) -> i32 {
 
     let config = UploadConfig {
         token,
-        api_url: args
-            .api_url
-            .or_else(|| std::env::var("GAFFER_API_URL").ok()),
+        api_url,
         commit_sha: args.commit_sha,
         branch: args.branch,
         test_framework: args.test_framework,
@@ -80,7 +82,12 @@ pub fn run(args: UploadArgs) -> i32 {
     }
 }
 
-fn resolve_token(flag: Option<String>) -> Result<String, UploadError> {
+/// Resolve the project token: `--token` flag, then the env var fallbacks,
+/// then, when neither is set and the runner has GitHub Actions OIDC
+/// available (`permissions: id-token: write`), an automatic token exchange.
+/// `gaffer test` reaches the same OIDC fallback through `Config::resolve`
+/// (config.rs); both paths bottom out in `oidc::try_exchange`.
+fn resolve_token(flag: Option<String>, api_url: Option<&str>) -> Result<String, UploadError> {
     if let Some(t) = flag.filter(|s| !s.is_empty()) {
         return Ok(t);
     }
@@ -94,9 +101,27 @@ fn resolve_token(flag: Option<String>) -> Result<String, UploadError> {
             }
         }
     }
+
+    if let Some(result) = oidc::try_exchange(api_url) {
+        return match result {
+            Ok(exchanged) => {
+                oidc::print_auth_success(&exchanged);
+                Ok(exchanged.access_token)
+            }
+            Err(e) => Err(UploadError::user(
+                "missing_token",
+                format!(
+                    "Project token not provided and the GitHub Actions OIDC exchange failed: {e}. \
+                     Grant `permissions: id-token: write` to this job, or pass --token / set GAFFER_PROJECT_TOKEN."
+                ),
+            )),
+        };
+    }
+
     Err(UploadError::user(
         "missing_token",
-        "Project token not provided. Pass --token or set GAFFER_PROJECT_TOKEN.",
+        "Project token not provided. Pass --token, set GAFFER_PROJECT_TOKEN, or on GitHub Actions \
+         grant `permissions: id-token: write` so gaffer can authenticate automatically.",
     ))
 }
 
@@ -197,7 +222,7 @@ fn classify_cause(err: &UploadError) -> &'static str {
 fn suggested_fix(err: &UploadError) -> &'static str {
     match err {
         UploadError::UserError { kind, .. } => match *kind {
-            "missing_token" => "pass --token <gfr_…> or set GAFFER_PROJECT_TOKEN",
+            "missing_token" => "pass --token <gfr_…>, set GAFFER_PROJECT_TOKEN, or on GitHub Actions grant `permissions: id-token: write` for automatic auth",
             "no_files" => "verify the path or glob expands to at least one file",
             "file_too_large" => "raise --max-file-size-mb or split the file",
             "path_not_found" => "double-check the path and CI working directory",
@@ -214,5 +239,59 @@ fn suggested_fix(err: &UploadError) -> &'static str {
             _ => "retry; if it persists, share the JSON error line with support",
         },
         UploadError::Unexpected { .. } => "rerun with --debug and share the full output with support",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::oidc::ENV_MUTEX;
+
+    const TOKEN_VARS: [&str; 3] = ["GAFFER_PROJECT_TOKEN", "GAFFER_UPLOAD_TOKEN", "GAFFER_TOKEN"];
+    const OIDC_VARS: [&str; 2] = ["ACTIONS_ID_TOKEN_REQUEST_URL", "ACTIONS_ID_TOKEN_REQUEST_TOKEN"];
+
+    fn clear_token_env() {
+        for var in TOKEN_VARS.into_iter().chain(OIDC_VARS) {
+            std::env::remove_var(var);
+        }
+    }
+
+    #[test]
+    fn resolve_token_explicit_flag_wins_over_everything() {
+        let _lock = ENV_MUTEX.lock().unwrap();
+        clear_token_env();
+        std::env::set_var("GAFFER_PROJECT_TOKEN", "env-token");
+        std::env::set_var("ACTIONS_ID_TOKEN_REQUEST_URL", "http://example.invalid/token");
+        std::env::set_var("ACTIONS_ID_TOKEN_REQUEST_TOKEN", "runner-bearer");
+
+        let result = resolve_token(Some("flag-token".to_string()), None);
+
+        clear_token_env();
+        assert_eq!(result.unwrap(), "flag-token");
+    }
+
+    #[test]
+    fn resolve_token_env_var_wins_over_oidc() {
+        let _lock = ENV_MUTEX.lock().unwrap();
+        clear_token_env();
+        std::env::set_var("GAFFER_PROJECT_TOKEN", "env-token");
+        std::env::set_var("ACTIONS_ID_TOKEN_REQUEST_URL", "http://example.invalid/token");
+        std::env::set_var("ACTIONS_ID_TOKEN_REQUEST_TOKEN", "runner-bearer");
+
+        let result = resolve_token(None, None);
+
+        clear_token_env();
+        assert_eq!(result.unwrap(), "env-token");
+    }
+
+    #[test]
+    fn resolve_token_missing_everything_hints_at_id_token_permission() {
+        let _lock = ENV_MUTEX.lock().unwrap();
+        clear_token_env();
+
+        let err = resolve_token(None, None).unwrap_err();
+
+        assert_eq!(err.kind(), "missing_token");
+        assert!(err.to_string().contains("id-token: write"));
     }
 }

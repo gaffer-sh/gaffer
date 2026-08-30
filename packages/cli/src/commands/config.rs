@@ -100,6 +100,7 @@ fn source_label(source: &ConfigSource) -> String {
         ConfigSource::ExplicitConfig => "from --config".to_string(),
         ConfigSource::LocalConfig => "from local config".to_string(),
         ConfigSource::GlobalConfig => "from global config".to_string(),
+        ConfigSource::Oidc => "from GitHub Actions OIDC".to_string(),
         ConfigSource::Default => "default".to_string(),
     }
 }

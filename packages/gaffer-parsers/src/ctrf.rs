@@ -85,6 +85,8 @@ impl Parser for CtrfParser {
                     file_path: test.file_path.clone(),
                     line: test.line,
                     retry_attempt: test.retries.map(|r| r as u32),
+                    started_at: None,
+                    worker_index: None,
                 }
             })
             .collect();
