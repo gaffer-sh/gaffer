@@ -4,15 +4,19 @@
 //! `gaffer-uploader@v2` GitHub Action. Two paths share one entry point:
 //!
 //! * **Small bundle** — `multipart/form-data` POST to `/api/upload`, used when
-//!   no individual file exceeds 90 MB AND the cumulative size of the bundle
-//!   stays under 200 MB. The 90 MB ceiling matches Cloudflare's Free zone
-//!   per-request body cap; the 200 MB total keeps the streamed upload well
-//!   under the same edge cap with margin for form encoding overhead.
+//!   the *encoded* request body fits inside the server's v1 ceiling
+//!   (`V1_UPLOAD_CEILING_BYTES`). The server rejects on `Content-Length`, so
+//!   routing budgets the multipart framing too — see `encoded_bundle_size`.
 //!
-//! * **Multipart upload (MPU)** — used per-large-file when any single file
-//!   exceeds 90 MB. Drives the `/api/upload/mpu/{create,part,complete,abort}`
+//! * **Multipart upload (MPU)** — used per-file for anything that cannot fit
+//!   a single POST. Drives the `/api/upload/mpu/{create,part,complete,abort}`
 //!   endpoints landed in TASK-39. Part PUTs run in parallel under a tokio
 //!   `Semaphore(8)` so a single 5 GB upload doesn't fan out unbounded.
+//!
+//! When the server disagrees with our ceiling it says so: a 413 carries
+//! `{ ceiling, declaredSize, migration }` in its error envelope. Routing
+//! honours that figure and re-plans once rather than failing the run
+//! (GAF-255), so a server-side ceiling change doesn't need a CLI release.
 //!
 //! Errors surface as `UploadError` so the CLI command can render a structured
 //! JSON line + human-readable block on failure (see `commands/upload.rs`).
@@ -22,7 +26,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use futures::stream::{FuturesUnordered, StreamExt};
-use reqwest::{multipart, Client, Response, StatusCode};
+use reqwest::{header, multipart, Client, Response, StatusCode};
 use serde::{Deserialize, Serialize};
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncSeekExt, SeekFrom};
@@ -30,13 +34,27 @@ use tokio::sync::Semaphore;
 
 const DEFAULT_API_URL: &str = "https://app.gaffer.sh";
 
-/// Files larger than this go through MPU. Matches the Cloudflare Free zone
-/// per-request body cap (~100 MiB) with a margin to keep us safely under.
-pub const SMALL_FILE_THRESHOLD: u64 = 90 * 1024 * 1024;
+/// Largest request body `/api/upload` will accept. Must equal
+/// `MAX_V1_UPLOAD_SIZE_BYTES` in `@gaffer/pricing`; the server rejects a
+/// larger `Content-Length` with a 413 before the handler runs.
+///
+/// This is a default, not an authority — the server's 413 envelope reports
+/// the live figure and routing re-plans against it. Two parity tests keep the
+/// default honest from either side of the language boundary (GAF-258):
+/// `tests/v1_ceiling_parity.rs` here, and `cli-upload-ceiling-parity.spec.ts`
+/// in the dashboard. Editing one constant without the other fails whichever
+/// suite the editor was already running.
+pub const V1_UPLOAD_CEILING_BYTES: u64 = 75 * 1024 * 1024;
 
-/// Bundles whose cumulative size exceeds this get split rather than going to
-/// `/api/upload` as a single request.
-pub const SMALL_BUNDLE_TOTAL_THRESHOLD: u64 = 200 * 1024 * 1024;
+/// Per-file cost of multipart framing: the boundary line, the
+/// `Content-Disposition` and `Content-Type` headers, and the trailing CRLF.
+/// 256 bytes covers that fixed text plus reqwest's 70-char boundary. The
+/// filename is the only unbounded term, so routing counts it separately.
+const MULTIPART_PART_FRAMING_BYTES: u64 = 256;
+
+/// Whole-form framing cost: the closing boundary and the `tags` part's own
+/// headers. The `tags` value length is added on top by `encoded_bundle_size`.
+const MULTIPART_FORM_FRAMING_BYTES: u64 = 512;
 
 /// Hard ceiling on a single MPU object — matches R2's per-object limit and
 /// the server-side `MAX_MPU_TOTAL_BYTES`.
@@ -72,6 +90,12 @@ pub struct UploadConfig {
     /// Per-file size limit in megabytes. Files exceeding this are rejected
     /// up front as a user error before any HTTP traffic.
     pub max_file_size_mb: u64,
+    /// Version of the binary making the request, stamped into `User-Agent`
+    /// and `gaffer-client-version`. Callers pass their *own*
+    /// `CARGO_PKG_VERSION` — reading it inside this crate would report
+    /// gaffer-core's version instead, which is what used to happen and left
+    /// every server-side mitigation guessing (GAF-255).
+    pub client_version: String,
     pub debug: bool,
 }
 
@@ -86,6 +110,7 @@ impl std::fmt::Debug for UploadConfig {
             .field("test_suite", &self.test_suite)
             .field("timeout_secs", &self.timeout_secs)
             .field("max_file_size_mb", &self.max_file_size_mb)
+            .field("client_version", &self.client_version)
             .field("debug", &self.debug)
             .finish()
     }
@@ -135,10 +160,29 @@ pub struct UploadOutcome {
     pub files_uploaded: usize,
     pub bytes_uploaded: u64,
     pub elapsed_ms: u128,
-    /// One entry per `/api/upload` or `/api/upload/mpu/complete` call. The
-    /// CLI prints the first one's session id as `test_run_id` for v1 parity.
+    /// The finalized session. Always exactly one: an upload that needs more
+    /// than one request still lands as a single multi-file session (GAF-255).
+    /// Kept as a Vec so the CLI's JSON output shape is unchanged.
     pub responses: Vec<ServerUploadResponse>,
 }
+
+/// What the dashboard returns for a non-final write into a multi-file
+/// session (an append POST, or `/mpu/complete` on a joined MPU).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SessionAppendResponse {
+    #[allow(dead_code)]
+    files_received: u64,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SessionOpenResponse {
+    upload_session_id: String,
+}
+
+/// Header that turns `POST /api/upload` into an append to an open session.
+const UPLOAD_SESSION_HEADER: &str = "X-Gaffer-Upload-Session";
 
 /// Mirrors the dashboard's `UploadResponse` — the relevant subset.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -174,6 +218,9 @@ pub enum UploadError {
         status: Option<u16>,
         upload_session_id: Option<String>,
         cf_ray_id: Option<String>,
+        /// Byte ceiling the server reported in a 413 envelope, when it sent
+        /// one. Routing re-plans against this instead of failing the run.
+        ceiling: Option<u64>,
     },
     #[error("{message}")]
     Unexpected {
@@ -197,6 +244,7 @@ impl UploadError {
             status: None,
             upload_session_id: None,
             cf_ray_id: None,
+            ceiling: None,
         }
     }
 
@@ -231,6 +279,21 @@ impl UploadError {
         self
     }
 
+    fn with_ceiling(mut self, bytes: u64) -> Self {
+        if let UploadError::ServerError { ceiling, .. } = &mut self {
+            *ceiling = Some(bytes);
+        }
+        self
+    }
+
+    /// Ceiling the server reported in a 413 envelope, if any.
+    pub fn ceiling(&self) -> Option<u64> {
+        match self {
+            UploadError::ServerError { ceiling, .. } => *ceiling,
+            _ => None,
+        }
+    }
+
     pub fn kind(&self) -> &'static str {
         match self {
             UploadError::UserError { kind, .. }
@@ -256,12 +319,17 @@ pub type UploadResult<T> = Result<T, UploadError>;
 
 /// Upload one or more files / directories to the Gaffer dashboard.
 ///
-/// Routing rules (per AC #1 of TASK-40):
-/// * Largest individual file `< 90 MB` AND total `< 200 MB`
-///   → single `multipart/form-data` POST to `/api/upload`.
-/// * Otherwise: each file `>= 90 MB` takes its own MPU cycle, and remaining
-///   small files are bundled into one or more `/api/upload` calls (split if
-///   the bundle would itself exceed the 200 MB threshold).
+/// Routing rules:
+/// * A file whose encoded multipart body would exceed the v1 ceiling goes
+///   over MPU — it cannot fit a single POST at all.
+/// * Everything else is packed into `/api/upload` bundles whose encoded body
+///   stays at or under the ceiling.
+/// * When that takes more than one request, every request writes into one
+///   multi-file session, finalized once (GAF-255). Splitting across sessions
+///   would break a hosted HTML report's links to assets in another session,
+///   and fail any request that carried only artifacts.
+/// * A 413 naming a lower ceiling re-plans that bundle once at the server's
+///   figure.
 pub async fn run(paths: &[PathBuf], config: &UploadConfig) -> UploadResult<UploadOutcome> {
     let start = Instant::now();
 
@@ -293,54 +361,203 @@ pub async fn run(paths: &[PathBuf], config: &UploadConfig) -> UploadResult<Uploa
     }
 
     let total_bytes: u64 = files.iter().map(|f| f.size).sum();
-    let largest = files.iter().map(|f| f.size).max().unwrap_or(0);
     let total_files = files.len();
 
-    let client = build_http_client(config.timeout_secs)?;
-    let mut responses = Vec::new();
+    let client = build_http_client(config)?;
+    let tags_len = config.tags().to_string().len() as u64;
+    let plan = UploadPlan::new(files, V1_UPLOAD_CEILING_BYTES, tags_len);
+    let response = upload_planned(&client, config, plan, tags_len).await?;
 
-    if largest < SMALL_FILE_THRESHOLD && total_bytes < SMALL_BUNDLE_TOTAL_THRESHOLD {
-        let resp = upload_small_bundle(&client, config, &files).await?;
-        responses.push(resp);
-    } else {
-        let (large_files, small_files): (Vec<_>, Vec<_>) = files
-            .into_iter()
-            .partition(|f| f.size >= SMALL_FILE_THRESHOLD);
+    Ok(UploadOutcome {
+        upload_session_id: response.upload_session.id.clone(),
+        project_id: response.upload_session.project_id.clone(),
+        files_uploaded: total_files,
+        bytes_uploaded: total_bytes,
+        elapsed_ms: start.elapsed().as_millis(),
+        responses: vec![response],
+    })
+}
 
-        for large in &large_files {
-            let resp = upload_mpu(&client, config, large).await?;
-            responses.push(resp);
-        }
+/// How a file set goes over the wire at a given ceiling.
+#[derive(Debug)]
+struct UploadPlan {
+    /// Files too large for any single POST: one MPU each.
+    large: Vec<UploadFile>,
+    /// POST bodies, each at or under the ceiling.
+    bundles: Vec<Vec<UploadFile>>,
+    ceiling: u64,
+}
 
-        // Pack remaining small files into bundles capped at the 200 MB
-        // single-request threshold. One bundle in the common case; multiple
-        // only when there's enough small-file payload to overflow it.
-        for bundle in pack_small_bundles(small_files) {
-            if bundle.is_empty() {
-                continue;
-            }
-            let resp = upload_small_bundle(&client, config, &bundle).await?;
-            responses.push(resp);
+impl UploadPlan {
+    fn new(files: Vec<UploadFile>, ceiling: u64, tags_len: u64) -> Self {
+        let (large, small) = partition_by_ceiling(files, ceiling, tags_len);
+        let bundles = pack_small_bundles(small, ceiling, tags_len);
+        UploadPlan {
+            large,
+            bundles,
+            ceiling,
         }
     }
 
-    let elapsed_ms = start.elapsed().as_millis();
-    let primary_session_id = responses
-        .first()
-        .map(|r| r.upload_session.id.clone())
-        .unwrap_or_default();
-    let primary_project_id = responses
-        .first()
-        .and_then(|r| r.upload_session.project_id.clone());
+    /// Requests needed to send everything. One needs no multi-file session.
+    fn request_count(&self) -> usize {
+        self.large.len() + self.bundles.len()
+    }
+}
 
-    Ok(UploadOutcome {
-        upload_session_id: primary_session_id,
-        project_id: primary_project_id,
-        files_uploaded: total_files,
-        bytes_uploaded: total_bytes,
-        elapsed_ms,
-        responses,
-    })
+/// Send a plan. One request goes out session-free, exactly as before GAF-255;
+/// anything more opens a multi-file session.
+async fn upload_planned(
+    client: &Client,
+    config: &UploadConfig,
+    mut plan: UploadPlan,
+    tags_len: u64,
+) -> UploadResult<ServerUploadResponse> {
+    if plan.request_count() > 1 {
+        return upload_in_session(client, config, plan, tags_len).await;
+    }
+    if let Some(file) = plan.large.pop() {
+        return upload_mpu(client, config, &file, None).await;
+    }
+    let bundle = plan.bundles.pop().unwrap_or_default();
+    let err = match upload_small_bundle(client, config, &bundle, None).await {
+        Ok(resp) => return Ok(resp),
+        Err(e) => e,
+    };
+    let Some(server_ceiling) = lower_ceiling(&err, plan.ceiling, config.debug, bundle.len()) else {
+        return Err(err);
+    };
+    let replanned = UploadPlan::new(bundle, server_ceiling, tags_len);
+    if replanned.request_count() > 1 {
+        return upload_in_session(client, config, replanned, tags_len).await;
+    }
+    // Still one request at the server's ceiling: it can only be a lone MPU,
+    // since the same bundle just failed as a POST.
+    match replanned.large.into_iter().next() {
+        Some(file) => upload_mpu(client, config, &file, None).await,
+        None => Err(err),
+    }
+}
+
+/// The server's 413 `ceiling`, when it is lower than the one we planned at.
+/// An equal or higher figure is a disagreement re-planning cannot fix.
+fn lower_ceiling(err: &UploadError, planned: u64, debug: bool, files: usize) -> Option<u64> {
+    let server_ceiling = err.ceiling().filter(|c| *c < planned)?;
+    if debug {
+        eprintln!(
+            "[gaffer] server reported a {} byte v1 ceiling (we assumed {}); \
+             re-planning {} file(s)",
+            server_ceiling, planned, files,
+        );
+    }
+    Some(server_ceiling)
+}
+
+/// Open a multi-file session, send every request of the plan into it, and
+/// finalize once. A failure part-way leaves the session `receiving`; the
+/// dashboard's stale-receiving sweep closes it, so there is nothing to undo.
+async fn upload_in_session(
+    client: &Client,
+    config: &UploadConfig,
+    plan: UploadPlan,
+    tags_len: u64,
+) -> UploadResult<ServerUploadResponse> {
+    let session_id = open_session(client, config).await?;
+    let sent = async {
+        for file in &plan.large {
+            upload_mpu::<SessionAppendResponse>(client, config, file, Some(&session_id)).await?;
+        }
+        for bundle in plan.bundles {
+            append_bundle(client, config, &session_id, bundle, plan.ceiling, tags_len).await?;
+        }
+        finalize_session(client, config, &session_id).await
+    };
+    sent.await.map_err(|e| e.with_session(session_id.clone()))
+}
+
+/// Append one bundle to a session, re-planning it **once** if the server
+/// answers with a lower ceiling. The session stays open across that 413 (the
+/// dashboard rejects it without marking the session failed). A second 413
+/// after re-planning at the server's own number is a real failure — looping
+/// would just retry the same rejection.
+async fn append_bundle(
+    client: &Client,
+    config: &UploadConfig,
+    session_id: &str,
+    bundle: Vec<UploadFile>,
+    ceiling: u64,
+    tags_len: u64,
+) -> UploadResult<()> {
+    let err = match upload_small_bundle::<SessionAppendResponse>(
+        client,
+        config,
+        &bundle,
+        Some(session_id),
+    )
+    .await
+    {
+        Ok(_) => return Ok(()),
+        Err(e) => e,
+    };
+    let Some(server_ceiling) = lower_ceiling(&err, ceiling, config.debug, bundle.len()) else {
+        return Err(err);
+    };
+    let replanned = UploadPlan::new(bundle, server_ceiling, tags_len);
+    for file in &replanned.large {
+        upload_mpu::<SessionAppendResponse>(client, config, file, Some(session_id)).await?;
+    }
+    for b in &replanned.bundles {
+        upload_small_bundle::<SessionAppendResponse>(client, config, b, Some(session_id)).await?;
+    }
+    Ok(())
+}
+
+async fn open_session(client: &Client, config: &UploadConfig) -> UploadResult<String> {
+    let url = format!(
+        "{}/api/upload/session",
+        config.api_url().trim_end_matches('/')
+    );
+    let body = serde_json::json!({ "tags": config.tags() });
+    let send = || async {
+        client
+            .post(&url)
+            .header("X-API-Key", &config.token)
+            .json(&body)
+            .send()
+            .await
+            .map_err(reqwest_to_upload_error)
+    };
+    let resp = send_with_retry(send, config.debug, "POST /api/upload/session").await?;
+    let opened: SessionOpenResponse = parse_json_response(resp).await?;
+    if config.debug {
+        eprintln!(
+            "[gaffer] opened multi-file session {}",
+            opened.upload_session_id
+        );
+    }
+    Ok(opened.upload_session_id)
+}
+
+async fn finalize_session(
+    client: &Client,
+    config: &UploadConfig,
+    session_id: &str,
+) -> UploadResult<ServerUploadResponse> {
+    let url = format!(
+        "{}/api/upload/session/{}/finalize",
+        config.api_url().trim_end_matches('/'),
+        session_id
+    );
+    let send = || async {
+        client
+            .post(&url)
+            .header("X-API-Key", &config.token)
+            .send()
+            .await
+            .map_err(reqwest_to_upload_error)
+    };
+    let resp = send_with_retry(send, config.debug, "POST /api/upload/session/finalize").await?;
+    parse_upload_response(resp).await
 }
 
 // ----- File enumeration ----------------------------------------------------
@@ -449,27 +666,70 @@ fn over_max_file_error(path: &Path, size: u64, max_mb: u64) -> UploadError {
     )
 }
 
-/// Pack small files into ≤200 MB bundles.
+// ----- Ceiling-aware routing -----------------------------------------------
+
+/// Bytes a single file contributes to a `multipart/form-data` body: its
+/// content, its filename (echoed in `Content-Disposition`), and the fixed
+/// framing around it.
+fn encoded_part_size(file: &UploadFile) -> u64 {
+    file.size + file.relative_path.len() as u64 + MULTIPART_PART_FRAMING_BYTES
+}
+
+/// Bytes the whole request body would declare in `Content-Length`.
+///
+/// The server rejects on the declared length, not on the sum of file sizes,
+/// so routing has to budget the framing. Overshooting here costs an extra
+/// request; undershooting costs a 413 — so the estimate is deliberately
+/// generous (see `MULTIPART_PART_FRAMING_BYTES`).
+fn encoded_bundle_size(files: &[UploadFile], tags_len: u64) -> u64 {
+    files.iter().map(encoded_part_size).sum::<u64>() + MULTIPART_FORM_FRAMING_BYTES + tags_len
+}
+
+/// Split files into those that cannot fit a single POST at all and those that
+/// can be bundled. A file is "large" when its own one-file request body would
+/// already exceed `ceiling`.
+fn partition_by_ceiling(
+    files: Vec<UploadFile>,
+    ceiling: u64,
+    tags_len: u64,
+) -> (Vec<UploadFile>, Vec<UploadFile>) {
+    files
+        .into_iter()
+        .partition(|f| encoded_bundle_size(std::slice::from_ref(f), tags_len) > ceiling)
+}
+
+/// Pack bundleable files into requests whose encoded body stays at or under
+/// `ceiling`.
 ///
 /// First-fit decreasing: sort largest-first, then drop each file into the
-/// first bundle that has room; otherwise start a new one. Common case is one
-/// bundle — this only matters when a project ships many small files whose
-/// cumulative size exceeds `SMALL_BUNDLE_TOTAL_THRESHOLD`.
-fn pack_small_bundles(mut files: Vec<UploadFile>) -> Vec<Vec<UploadFile>> {
+/// first bundle that still has room; otherwise start a new one. Common case
+/// is one bundle — this only matters when a project ships enough files to
+/// overflow the ceiling, which is exactly the Playwright-artifact shape that
+/// used to 413 (GAF-255).
+///
+/// Callers must have removed un-bundleable files first (`partition_by_ceiling`)
+/// so every file is guaranteed to fit a bundle of its own.
+fn pack_small_bundles(
+    mut files: Vec<UploadFile>,
+    ceiling: u64,
+    tags_len: u64,
+) -> Vec<Vec<UploadFile>> {
     files.sort_by_key(|f| std::cmp::Reverse(f.size));
+    let overhead = MULTIPART_FORM_FRAMING_BYTES + tags_len;
     let mut bundles: Vec<(u64, Vec<UploadFile>)> = Vec::new();
     for f in files {
+        let part = encoded_part_size(&f);
         let mut placed = false;
         for (sz, bucket) in bundles.iter_mut() {
-            if *sz + f.size < SMALL_BUNDLE_TOTAL_THRESHOLD {
-                *sz += f.size;
+            if *sz + part <= ceiling {
+                *sz += part;
                 bucket.push(f.clone());
                 placed = true;
                 break;
             }
         }
         if !placed {
-            bundles.push((f.size, vec![f]));
+            bundles.push((overhead + part, vec![f]));
         }
     }
     bundles.into_iter().map(|(_, b)| b).collect()
@@ -477,13 +737,32 @@ fn pack_small_bundles(mut files: Vec<UploadFile>) -> Vec<Vec<UploadFile>> {
 
 // ----- HTTP client ---------------------------------------------------------
 
-fn build_http_client(timeout_secs: u64) -> UploadResult<Client> {
+fn build_http_client(config: &UploadConfig) -> UploadResult<Client> {
+    // `gaffer-client` / `gaffer-client-version` are read by the dashboard's
+    // upload analytics and `X-Gaffer-Source` by its audit log. Sending them on
+    // every request — not just the v1 POST — means a server-side mitigation
+    // can tell an old CLI from a new one on any endpoint (GAF-255).
+    let mut headers = header::HeaderMap::new();
+    headers.insert("gaffer-client", header::HeaderValue::from_static("gaffer-cli"));
+    headers.insert("X-Gaffer-Source", header::HeaderValue::from_static("cli"));
+    let version = header::HeaderValue::from_str(&config.client_version).map_err(|e| {
+        UploadError::unexpected(
+            "http_init",
+            format!(
+                "client version {:?} is not a valid header value: {}",
+                config.client_version, e
+            ),
+        )
+    })?;
+    headers.insert("gaffer-client-version", version);
+
     Client::builder()
         // The per-request timeout governs each individual HTTP call. A large
         // MPU upload is many calls, so this is *not* a wall-clock budget for
         // the whole upload — it's the deadline for any single round-trip.
-        .timeout(Duration::from_secs(timeout_secs))
-        .user_agent(format!("gaffer-cli/{}", env!("CARGO_PKG_VERSION")))
+        .timeout(Duration::from_secs(config.timeout_secs))
+        .user_agent(format!("gaffer-cli/{}", config.client_version))
+        .default_headers(headers)
         .build()
         .map_err(|e| UploadError::unexpected("http_init", format!("HTTP client init: {}", e)))
 }
@@ -534,11 +813,15 @@ fn content_type_for(path: &str) -> &'static str {
     }
 }
 
-async fn upload_small_bundle(
+/// One `/api/upload` POST. With `session` it appends to that open multi-file
+/// session (the server answers with a `SessionAppendResponse`); without, it
+/// creates and finalizes its own session (a `ServerUploadResponse`).
+async fn upload_small_bundle<T: for<'de> Deserialize<'de>>(
     client: &Client,
     config: &UploadConfig,
     files: &[UploadFile],
-) -> UploadResult<ServerUploadResponse> {
+    session: Option<&str>,
+) -> UploadResult<T> {
     let url = format!("{}/api/upload", config.api_url().trim_end_matches('/'));
     let tags_json = config.tags().to_string();
 
@@ -559,10 +842,13 @@ async fn upload_small_bundle(
         }
         form = form.text("tags", tags_json.clone());
 
-        let req = client
+        let mut req = client
             .post(&url)
             .header("X-API-Key", &config.token)
             .multipart(form);
+        if let Some(sid) = session {
+            req = req.header(UPLOAD_SESSION_HEADER, sid);
+        }
 
         if config.debug {
             eprintln!("[gaffer] POST {} ({} files)", url, files.len());
@@ -572,7 +858,7 @@ async fn upload_small_bundle(
     };
 
     let resp = send_with_retry(send, config.debug, "POST /api/upload").await?;
-    parse_upload_response(resp).await
+    parse_json_response(resp).await
 }
 
 // ----- MPU path ------------------------------------------------------------
@@ -583,6 +869,9 @@ struct MpuCreateRequest<'a> {
     file_name: &'a str,
     file_size: u64,
     tags: serde_json::Value,
+    /// Join this open multi-file session instead of creating one (GAF-255).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    upload_session_id: Option<&'a str>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -611,11 +900,15 @@ struct MpuCompleteRequest<'a> {
     parts: &'a [UploadedPart],
 }
 
-async fn upload_mpu(
+/// One file over R2 multipart. With `session` the MPU joins that open
+/// multi-file session and `/complete` appends rather than finalizes, so the
+/// response is a `SessionAppendResponse`; without, a `ServerUploadResponse`.
+async fn upload_mpu<T: for<'de> Deserialize<'de>>(
     client: &Client,
     config: &UploadConfig,
     file: &UploadFile,
-) -> UploadResult<ServerUploadResponse> {
+    session: Option<&str>,
+) -> UploadResult<T> {
     let base = config.api_url().trim_end_matches('/').to_string();
     let create_url = format!("{}/api/upload/mpu/create", base);
     let part_url = format!("{}/api/upload/mpu/part", base);
@@ -628,6 +921,7 @@ async fn upload_mpu(
         file_name: &file.relative_path,
         file_size: file.size,
         tags: config.tags(),
+        upload_session_id: session,
     };
     let create_send = || async {
         client
@@ -712,7 +1006,7 @@ async fn upload_mpu(
         }
     };
 
-    parse_upload_response(complete_resp).await
+    parse_json_response(complete_resp).await
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -998,7 +1292,8 @@ async fn server_error_from_response(label: &str, resp: Response) -> UploadError 
         .map(|s| s.to_string());
 
     let body = resp.text().await.unwrap_or_default();
-    let (message, sid) = parse_error_body(&body);
+    let envelope = parse_error_body(&body);
+    let message = envelope.message;
     let kind: &'static str = if status >= 500 || status == 429 {
         "server_error"
     } else if status == 401 || status == 403 {
@@ -1015,33 +1310,60 @@ async fn server_error_from_response(label: &str, resp: Response) -> UploadError 
         format!("{} failed ({}): {}", label, status, message),
     )
     .with_status(status);
-    if let Some(sid) = sid {
+    if let Some(sid) = envelope.upload_session_id {
         err = err.with_session(sid);
     }
     if let Some(ray) = cf_ray {
         err = err.with_ray(ray);
     }
+    // Only a 413 carries a meaningful ceiling. Reading it off other statuses
+    // would let an unrelated field named `ceiling` re-plan the upload.
+    if status == 413 {
+        if let Some(ceiling) = envelope.ceiling {
+            err = err.with_ceiling(ceiling);
+        }
+    }
     err
 }
 
-/// Try to extract a human message + uploadSessionId from the H3 error envelope
-/// or from a free-form error body. Falls back to the raw body on parse fail.
-fn parse_error_body(body: &str) -> (String, Option<String>) {
-    if let Ok(v) = serde_json::from_str::<serde_json::Value>(body) {
-        let msg = v
+/// Fields worth recovering from the dashboard's H3 error envelope
+/// (`{ statusMessage, data: { uploadSessionId, ceiling, … } }`).
+struct ErrorEnvelope {
+    message: String,
+    upload_session_id: Option<String>,
+    /// `data.ceiling` from the v1 413 (`file_too_large_for_v1`). The server's
+    /// live `MAX_V1_UPLOAD_SIZE_BYTES`, which may differ from our default.
+    ceiling: Option<u64>,
+}
+
+/// Try to extract a human message + uploadSessionId + ceiling from the H3
+/// error envelope, or from a free-form error body. Falls back to the raw body
+/// on parse fail.
+fn parse_error_body(body: &str) -> ErrorEnvelope {
+    let Ok(v) = serde_json::from_str::<serde_json::Value>(body) else {
+        return ErrorEnvelope {
+            message: body.to_string(),
+            upload_session_id: None,
+            ceiling: None,
+        };
+    };
+    ErrorEnvelope {
+        message: v
             .get("statusMessage")
             .or_else(|| v.get("message"))
             .and_then(|s| s.as_str())
             .map(|s| s.to_string())
-            .unwrap_or_else(|| body.to_string());
-        let sid = v
+            .unwrap_or_else(|| body.to_string()),
+        upload_session_id: v
             .pointer("/data/uploadSessionId")
             .or_else(|| v.get("uploadSessionId"))
             .and_then(|s| s.as_str())
-            .map(|s| s.to_string());
-        return (msg, sid);
+            .map(|s| s.to_string()),
+        ceiling: v
+            .pointer("/data/ceiling")
+            .or_else(|| v.get("ceiling"))
+            .and_then(|c| c.as_u64()),
     }
-    (body.to_string(), None)
 }
 
 async fn parse_upload_response(resp: Response) -> UploadResult<ServerUploadResponse> {
@@ -1093,8 +1415,28 @@ mod tests {
             test_suite: None,
             timeout_secs: 30,
             max_file_size_mb: 100,
+            client_version: "9.9.9-test".into(),
             debug: false,
         }
+    }
+
+    const MIB: u64 = 1024 * 1024;
+
+    fn mk(name: &str, size: u64) -> UploadFile {
+        UploadFile {
+            absolute_path: PathBuf::new(),
+            relative_path: name.to_string(),
+            size,
+        }
+    }
+
+    /// Largest file content that still fits one request at the v1 ceiling,
+    /// given a filename of `name_len` bytes and no tags.
+    fn max_content_for(name_len: u64) -> u64 {
+        V1_UPLOAD_CEILING_BYTES
+            - MULTIPART_FORM_FRAMING_BYTES
+            - MULTIPART_PART_FRAMING_BYTES
+            - name_len
     }
 
     #[test]
@@ -1179,24 +1521,114 @@ mod tests {
     }
 
     #[test]
-    fn pack_small_bundles_keeps_under_threshold() {
-        let mk = |size| UploadFile {
-            absolute_path: PathBuf::new(),
-            relative_path: format!("f{}", size),
-            size,
-        };
-        let files = vec![
-            mk(150 * 1024 * 1024), // 150 MB
-            mk(150 * 1024 * 1024), // 150 MB
-            mk(10 * 1024 * 1024),  // 10 MB
-        ];
-        let bundles = pack_small_bundles(files);
-        assert!(bundles.iter().all(|b| {
-            let sz: u64 = b.iter().map(|f| f.size).sum();
-            sz < SMALL_BUNDLE_TOTAL_THRESHOLD
-        }));
-        // Two big files cannot share a bundle.
-        assert_eq!(bundles.len(), 2);
+    fn pack_small_bundles_never_exceeds_the_ceiling() {
+        // The GAF-255 shape: a Playwright artifact tree totalling 120 MiB of
+        // individually-small files. The old routing sent this as one POST into
+        // a 75 MiB ceiling; it must now split.
+        let files: Vec<_> = (0..120).map(|i| mk(&format!("trace-{i}.zip"), MIB)).collect();
+        let bundles = pack_small_bundles(files, V1_UPLOAD_CEILING_BYTES, 0);
+        assert!(bundles.len() > 1, "120 MiB must not go out as one request");
+        for b in &bundles {
+            assert!(
+                encoded_bundle_size(b, 0) <= V1_UPLOAD_CEILING_BYTES,
+                "bundle of {} files encodes to {} bytes, over the ceiling",
+                b.len(),
+                encoded_bundle_size(b, 0),
+            );
+        }
+        let packed: usize = bundles.iter().map(|b| b.len()).sum();
+        assert_eq!(packed, 120, "every file must land in exactly one bundle");
+    }
+
+    /// Boundary arithmetic on the bundling decision: a bundle whose encoded
+    /// body lands exactly on the ceiling is one request; one byte more is two.
+    #[test]
+    fn pack_small_bundles_at_under_and_over_the_ceiling() {
+        let budget = max_content_for("f.bin".len() as u64);
+
+        // Just under, and exactly at: one request.
+        for content in [budget - 1, budget] {
+            let bundles =
+                pack_small_bundles(vec![mk("f.bin", content)], V1_UPLOAD_CEILING_BYTES, 0);
+            assert_eq!(bundles.len(), 1, "content {content} should fit one request");
+            assert!(encoded_bundle_size(&bundles[0], 0) <= V1_UPLOAD_CEILING_BYTES);
+        }
+
+        // One byte over the ceiling in aggregate: two requests.
+        let bundles = pack_small_bundles(
+            vec![mk("f.bin", budget), mk("g.bin", 1)],
+            V1_UPLOAD_CEILING_BYTES,
+            0,
+        );
+        assert_eq!(bundles.len(), 2, "one byte over the ceiling must split");
+    }
+
+    /// Boundary arithmetic on the MPU decision: a file is only routed to MPU
+    /// when it cannot fit a single POST *including* its multipart framing.
+    #[test]
+    fn partition_by_ceiling_at_under_and_over_the_ceiling() {
+        let budget = max_content_for("f.bin".len() as u64);
+
+        for content in [budget - 1, budget] {
+            let (large, small) =
+                partition_by_ceiling(vec![mk("f.bin", content)], V1_UPLOAD_CEILING_BYTES, 0);
+            assert!(large.is_empty(), "content {content} fits a POST");
+            assert_eq!(small.len(), 1);
+        }
+
+        let (large, small) =
+            partition_by_ceiling(vec![mk("f.bin", budget + 1)], V1_UPLOAD_CEILING_BYTES, 0);
+        assert_eq!(large.len(), 1, "one byte over the ceiling must take MPU");
+        assert!(small.is_empty());
+    }
+
+    /// A file whose *content* is under the ceiling but whose encoded body is
+    /// not. The pre-GAF-255 routing compared raw file bytes to a threshold
+    /// above the server's limit and 413'd on exactly this shape.
+    #[test]
+    fn framing_overhead_counts_against_the_ceiling() {
+        let at_ceiling = mk("f.bin", V1_UPLOAD_CEILING_BYTES);
+        assert!(
+            encoded_bundle_size(std::slice::from_ref(&at_ceiling), 0) > V1_UPLOAD_CEILING_BYTES,
+            "a file sized exactly at the ceiling cannot fit once framed",
+        );
+        let (large, _) = partition_by_ceiling(vec![at_ceiling], V1_UPLOAD_CEILING_BYTES, 0);
+        assert_eq!(large.len(), 1);
+    }
+
+    #[test]
+    fn tags_length_shrinks_the_usable_budget() {
+        let budget = max_content_for("f.bin".len() as u64);
+        let tags_len = 64;
+        let (large, _) =
+            partition_by_ceiling(vec![mk("f.bin", budget)], V1_UPLOAD_CEILING_BYTES, tags_len);
+        assert_eq!(large.len(), 1, "tags part must count against the ceiling");
+    }
+
+    #[test]
+    fn parse_error_body_reads_the_v1_ceiling_envelope() {
+        let body = serde_json::json!({
+            "statusMessage": "File exceeds maximum size of 75MB",
+            "data": {
+                "reason": "file_too_large_for_v1",
+                "uploadSessionId": "upl_1",
+                "ceiling": 78_643_200u64,
+                "declaredSize": 125_829_120u64,
+                "migration": "https://gaffer.sh/install.sh",
+            },
+        })
+        .to_string();
+        let envelope = parse_error_body(&body);
+        assert_eq!(envelope.ceiling, Some(78_643_200));
+        assert_eq!(envelope.upload_session_id.as_deref(), Some("upl_1"));
+        assert!(envelope.message.contains("75MB"));
+    }
+
+    #[test]
+    fn parse_error_body_tolerates_a_non_json_body() {
+        let envelope = parse_error_body("413 Payload Too Large");
+        assert_eq!(envelope.ceiling, None);
+        assert_eq!(envelope.message, "413 Payload Too Large");
     }
 
     #[test]

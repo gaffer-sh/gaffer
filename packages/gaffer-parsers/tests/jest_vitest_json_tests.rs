@@ -1,4 +1,5 @@
 use gaffer_parsers::registry::ParserRegistry;
+use std::collections::BTreeSet;
 
 fn load_fixture(name: &str) -> String {
     let path = format!(
@@ -37,8 +38,8 @@ fn test_vitest_summary() {
 
     let summary = &report["data"]["summary"];
     assert_eq!(summary["total"], 5);
-    assert_eq!(summary["passed"], 4);
-    assert_eq!(summary["failed"], 0);
+    assert_eq!(summary["passed"], 3);
+    assert_eq!(summary["failed"], 1);
     assert_eq!(summary["skipped"], 1);
     assert_eq!(summary["flaky"], 0);
 }
@@ -51,17 +52,22 @@ fn test_vitest_test_cases() {
     let test_cases = report["data"]["testCases"].as_array().unwrap();
     assert_eq!(test_cases.len(), 5);
 
-    // First test case
+    // Real Vitest emits files in completion order, not alphabetically.
     assert_eq!(test_cases[0]["id"], "tc-1");
-    assert_eq!(test_cases[0]["name"], "should add two positive numbers");
-    assert_eq!(test_cases[0]["fullName"], "Calculator add should add two positive numbers");
-    assert_eq!(test_cases[0]["status"], "passed");
-    // 1.2699... rounds to 1
-    assert_eq!(test_cases[0]["durationMs"], 1);
+    assert_eq!(test_cases[0]["name"], "should authenticate user");
+    assert_eq!(test_cases[0]["fullName"], "Auth should authenticate user");
+    assert_eq!(test_cases[0]["status"], "failed");
+    // 4.4148... rounds to 4
+    assert_eq!(test_cases[0]["durationMs"], 4);
 
-    // Pending test
-    assert_eq!(test_cases[2]["status"], "skipped");
-    assert_eq!(test_cases[2]["name"], "pending feature");
+    // 0.8319... rounds to 1
+    assert_eq!(test_cases[2]["name"], "should add two positive numbers");
+    assert_eq!(test_cases[2]["durationMs"], 1);
+
+    // `it.skip`: real Vitest reports status "skipped" and omits `duration`.
+    assert_eq!(test_cases[4]["status"], "skipped");
+    assert_eq!(test_cases[4]["name"], "pending feature");
+    assert!(test_cases[4]["durationMs"].is_null());
 }
 
 #[test]
@@ -70,10 +76,25 @@ fn test_vitest_file_path_normalization() {
     let report = parse_via_registry(&json, "vitest-results.json");
 
     let test_cases = report["data"]["testCases"].as_array().unwrap();
-    // /home/runner/work/project/tests/calculator.test.ts -> tests/calculator.test.ts
-    assert_eq!(test_cases[0]["filePath"], "tests/calculator.test.ts");
-    // /home/runner/work/project/src/utils/string.test.ts -> src/utils/string.test.ts
-    assert_eq!(test_cases[3]["filePath"], "src/utils/string.test.ts");
+    // /home/runner/work/project/vt/tests/auth.test.ts -> tests/auth.test.ts
+    assert_eq!(test_cases[0]["filePath"], "tests/auth.test.ts");
+    // /home/runner/work/project/vt/tests/calculator.test.ts -> tests/calculator.test.ts
+    assert_eq!(test_cases[2]["filePath"], "tests/calculator.test.ts");
+}
+
+// The captured fixture only has `tests/` paths; this pins the `src` marker.
+#[test]
+fn test_vitest_file_path_normalization_src_marker() {
+    let json = r#"{"numTotalTestSuites":2,"numPassedTestSuites":2,"numFailedTestSuites":0,
+        "numPendingTestSuites":0,"numTotalTests":1,"numPassedTests":1,"numFailedTests":0,
+        "numPendingTests":0,"numTodoTests":0,"startTime":1,"success":true,"testResults":[
+        {"assertionResults":[{"ancestorTitles":["StringUtils"],"fullName":"StringUtils trims",
+        "status":"passed","title":"trims","duration":1,"failureMessages":[],"meta":{}}],
+        "startTime":1,"endTime":2,"status":"passed","message":"",
+        "name":"/home/runner/work/project/src/utils/string.test.ts"}]}"#;
+    let report = parse_via_registry(json, "vitest-results.json");
+
+    assert_eq!(report["data"]["testCases"][0]["filePath"], "src/utils/string.test.ts");
 }
 
 #[test]
@@ -81,8 +102,8 @@ fn test_vitest_duration_from_test_results() {
     let json = load_fixture("vitest-report.json");
     let report = parse_via_registry(&json, "vitest-results.json");
 
-    // Suite 1: 140630 - 140126 = 504ms, Suite 2: 141200 - 140700 = 500ms → 1004ms
-    assert_eq!(report["data"]["summary"]["durationMs"], 1004);
+    // Per-file endTime is fractional in real output: 4.4148ms + 1.081ms -> 5ms
+    assert_eq!(report["data"]["summary"]["durationMs"], 5);
 }
 
 #[test]
@@ -91,12 +112,90 @@ fn test_vitest_metadata() {
     let report = parse_via_registry(&json, "vitest-results.json");
 
     let metadata = &report["data"]["metadata"];
-    assert_eq!(metadata["suiteCount"], 2);
-    assert_eq!(metadata["passedSuites"], 2);
-    assert_eq!(metadata["failedSuites"], 0);
+    // Real Vitest counts files plus every `describe` block: 2 files + 3 describes.
+    assert_eq!(metadata["suiteCount"], 5);
+    assert_eq!(metadata["passedSuites"], 3);
+    assert_eq!(metadata["failedSuites"], 2);
     assert_eq!(metadata["pendingSuites"], 0);
-    assert_eq!(metadata["success"], true);
-    assert_eq!(metadata["startTime"], 1764894139853.0);
+    assert_eq!(metadata["success"], false);
+    assert_eq!(metadata["startTime"], 1787574088656.0);
+}
+
+// GAF-211: `vitest-report.json` used to omit the `snapshot` field that real
+// Vitest output always carries. This asserts the field is actually consumed
+// (not merely tolerated as an unknown key), so a future regression to a
+// snapshot-less fixture would be caught by a metadata mismatch here too.
+#[test]
+fn test_vitest_snapshot_metadata() {
+    let json = load_fixture("vitest-report.json");
+    let report = parse_via_registry(&json, "vitest-results.json");
+
+    let snapshots = &report["data"]["metadata"]["snapshots"];
+    assert_eq!(snapshots["total"], 0);
+    assert_eq!(snapshots["matched"], 0);
+    assert_eq!(snapshots["unmatched"], 0);
+    assert_eq!(snapshots["updated"], 0);
+}
+
+/// The 13 top-level keys Vitest's JSON reporter always emits.
+const VITEST_TOP_LEVEL_KEYS: [&str; 13] = [
+    "numTotalTestSuites",
+    "numPassedTestSuites",
+    "numFailedTestSuites",
+    "numPendingTestSuites",
+    "numTotalTests",
+    "numPassedTests",
+    "numFailedTests",
+    "numPendingTests",
+    "numTodoTests",
+    "snapshot",
+    "startTime",
+    "success",
+    "testResults",
+];
+
+/// Top-level keys of a fixture, minus `_fixtureProvenance` (bookkeeping, not shape).
+fn fixture_keys(name: &str) -> BTreeSet<String> {
+    let value: serde_json::Value =
+        serde_json::from_str(&load_fixture(name)).expect("fixture must be valid JSON");
+    value
+        .as_object()
+        .expect("fixture must be a JSON object")
+        .keys()
+        .filter(|k| *k != "_fixtureProvenance")
+        .cloned()
+        .collect()
+}
+
+fn expected_keys(extra: &[&str]) -> BTreeSet<String> {
+    VITEST_TOP_LEVEL_KEYS.iter().chain(extra).map(|k| k.to_string()).collect()
+}
+
+// GAF-211: structural guard against a fixture drifting from real Vitest output.
+// Compares exact key names, not a count: a misspelled key keeps the count
+// intact while the lenient parser silently defaults the missing field.
+#[test]
+fn test_vitest_fixture_matches_real_shape() {
+    assert_eq!(fixture_keys("vitest-report.json"), expected_keys(&[]));
+}
+
+#[test]
+fn test_vitest_coverage_fixture_matches_real_shape() {
+    assert_eq!(fixture_keys("vitest-report-with-coverage.json"), expected_keys(&["coverageMap"]));
+}
+
+// GAF-211: a second fixture variant with coverage enabled, matching the
+// 14-key shape (13 + coverageMap) real Vitest output has when
+// `test.coverage.enabled` is true. Confirms the parser tolerates the extra
+// field rather than choking on it.
+#[test]
+fn test_vitest_coverage_map_tolerated() {
+    let json = load_fixture("vitest-report-with-coverage.json");
+    let report = parse_via_registry(&json, "vitest-results.json");
+
+    assert_eq!(report["data"]["framework"], "vitest");
+    assert_eq!(report["data"]["summary"]["total"], 1);
+    assert_eq!(report["data"]["summary"]["passed"], 1);
 }
 
 // ============================================================================

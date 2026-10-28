@@ -52,6 +52,10 @@ pub fn run(args: UploadArgs) -> i32 {
         test_suite: args.test_suite,
         timeout_secs: args.timeout_secs,
         max_file_size_mb: args.max_file_size_mb,
+        // Read here, not in gaffer-core: `env!` expands against the crate
+        // being compiled, so gaffer-core reported *its own* version and every
+        // upload claimed to come from gaffer-cli/0.1.0 (GAF-255).
+        client_version: env!("CARGO_PKG_VERSION").to_string(),
         debug: args.debug,
     };
 
@@ -174,6 +178,7 @@ fn emit_error(err: &UploadError) {
         "httpStatus": status,
         "uploadSessionId": sid,
         "cfRayId": ray,
+        "serverCeilingBytes": err.ceiling(),
     });
     eprintln!("{}", json);
 
@@ -182,6 +187,14 @@ fn emit_error(err: &UploadError) {
     eprintln!("  Problem: {}", err);
     eprintln!("  Cause:   {}", classify_cause(err));
     eprintln!("  Fix:     {}", suggested_fix(err));
+    // The server states its own limit in the 413 envelope. Printing it turns
+    // "too large" into a number the user can act on (GAF-255).
+    if let Some(ceiling) = err.ceiling() {
+        eprintln!(
+            "  Server limit: {:.0} MB per request",
+            (ceiling as f64) / (1024.0 * 1024.0),
+        );
+    }
     if let Some(sid) = sid {
         eprintln!("  Upload session: {}", sid);
     }
@@ -205,7 +218,7 @@ fn classify_cause(err: &UploadError) -> &'static str {
         UploadError::ServerError { kind, status, .. } => match *kind {
             "auth_failed" => "the dashboard rejected the project token",
             "quota_exceeded" => "the org's storage quota would be exceeded",
-            "file_too_large" => "the dashboard reported the file as too large",
+            "file_too_large" => "the dashboard rejected the request body as too large",
             "server_error" => "the dashboard returned a transient error after retries",
             "network" => "network connectivity to the dashboard failed",
             "empty_response" => "the dashboard returned a 2xx with no body — likely a transport hiccup; the upload may have succeeded",
@@ -232,7 +245,7 @@ fn suggested_fix(err: &UploadError) -> &'static str {
         UploadError::ServerError { kind, .. } => match *kind {
             "auth_failed" => "regenerate the project token in the project's settings",
             "quota_exceeded" => "upgrade the plan or remove old reports to free space",
-            "file_too_large" => "the server's MPU ceiling is 5 GB — split the upload",
+            "file_too_large" => "gaffer already re-routes around the server's stated limit; if this persists, upgrade the CLI (https://gaffer.sh/install.sh) and rerun with --debug",
             "server_error" => "retry; if it persists, contact support with the Ray ID",
             "network" => "retry from a host with network access to the dashboard",
             "empty_response" => "check the dashboard for the upload session before retrying — the upload may already have landed",

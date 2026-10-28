@@ -27,6 +27,7 @@ fn cfg(api_url: &str) -> UploadConfig {
         test_suite: None,
         timeout_secs: 30,
         max_file_size_mb: 8 * 1024, // 8 GB so 5 GB MPU fixture isn't rejected
+        client_version: "9.9.9-test".into(),
         debug: false,
     }
 }
@@ -95,8 +96,8 @@ async fn mpu_happy_path_with_three_parts() {
     // 25 MB file with 10 MB parts → 3 parts (selectMpuPartSize bucket).
     let big = make_file(&dir, "trace.zip", 25 * 1024 * 1024);
     // Force routing to MPU by also passing a clearly-large declared file via
-    // the size bucket: 25 MB is below the 90 MB SMALL_FILE_THRESHOLD though,
-    // so we need a >=90 MB file to take the MPU path.
+    // the size bucket: 25 MB fits a single POST under the v1 ceiling, so we
+    // need a file past V1_UPLOAD_CEILING_BYTES to take the MPU path.
     let trace = make_file(&dir, "trace2.zip", 100 * 1024 * 1024);
     let _ = big; // referenced to silence unused warning if removed later
 
@@ -450,6 +451,387 @@ async fn semaphore_caps_at_eight_directly() {
         upload::MPU_PART_CONCURRENCY,
         observed,
     );
+}
+
+/// Enforces the dashboard's real v1 behaviour: reject on `Content-Length`
+/// over the ceiling, with the structured envelope, and accept otherwise.
+/// Mirrors `checkV1UploadCeiling` in
+/// `apps/dashboard/server/api/upload/index.post.ts`.
+struct V1CeilingServer {
+    ceiling: u64,
+}
+
+impl Respond for V1CeilingServer {
+    fn respond(&self, req: &Request) -> ResponseTemplate {
+        let declared = req.body.len() as u64;
+        if declared > self.ceiling {
+            return ResponseTemplate::new(413).set_body_json(json!({
+                "statusMessage": "File exceeds maximum size of 75MB",
+                "data": {
+                    "reason": "file_too_large_for_v1",
+                    "migration": "https://gaffer.sh/install.sh",
+                    "ceiling": self.ceiling,
+                    "declaredSize": declared,
+                },
+            }));
+        }
+        // An append into a multi-file session answers 202 without finalizing.
+        if let Some(sid) = req.headers.get("x-gaffer-upload-session") {
+            return ResponseTemplate::new(202)
+                .set_body_json(append_response_body(sid.to_str().unwrap_or_default()));
+        }
+        ResponseTemplate::new(200).set_body_json(upload_response_body("upl_split"))
+    }
+}
+
+fn append_response_body(session_id: &str) -> serde_json::Value {
+    json!({ "uploadSessionId": session_id, "status": "receiving", "filesReceived": 1 })
+}
+
+/// Mounts `POST /api/upload/session` (expected exactly `opens` times) and the
+/// matching finalize, which returns the canonical upload response.
+async fn mount_session(server: &MockServer, session_id: &str, opens: u64) {
+    Mock::given(method("POST"))
+        .and(path("/api/upload/session"))
+        .and(body_partial_json(
+            json!({ "tags": { "commitSha": "abc123", "branch": "main" } }),
+        ))
+        .respond_with(
+            ResponseTemplate::new(201).set_body_json(json!({ "uploadSessionId": session_id })),
+        )
+        .expect(opens)
+        .mount(server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path(format!("/api/upload/session/{}/finalize", session_id)))
+        .respond_with(ResponseTemplate::new(201).set_body_json(upload_response_body(session_id)))
+        .expect(opens)
+        .mount(server)
+        .await;
+}
+
+/// GAF-255, the defect itself: a bundle of individually-small files whose
+/// total lands between the client's old 200 MiB threshold and the server's
+/// 75 MiB ceiling. Every released CLI single-POSTs this and takes a 413 it
+/// cannot recover from. Routing must now split it below the real ceiling,
+/// and the split must land as ONE session: the dashboard serves a hosted
+/// HTML report's assets from the report's own session, and rejects any
+/// session holding no parseable file.
+///
+/// Two 40 MiB files rather than many 1 MiB ones: same routing decision at
+/// HEAD (largest < 90 MiB, total < 200 MiB → one POST), a third of the I/O.
+#[tokio::test]
+async fn bundle_between_the_ceiling_and_the_old_threshold_splits_into_one_session() {
+    let server = MockServer::start().await;
+    let dir = TempDir::new().unwrap();
+    let a = make_file(&dir, "index.html", 40 * 1024 * 1024);
+    let b = make_file(&dir, "shot.png", 40 * 1024 * 1024);
+
+    mount_session(&server, "upl_multi", 1).await;
+    Mock::given(method("POST"))
+        .and(path("/api/upload"))
+        .and(header("x-gaffer-upload-session", "upl_multi"))
+        .respond_with(V1CeilingServer {
+            ceiling: upload::V1_UPLOAD_CEILING_BYTES,
+        })
+        // Exactly two appends: one per 40 MiB bundle. Three would mean we
+        // wasted a round-trip discovering the ceiling we already knew.
+        .expect(2)
+        .mount(&server)
+        .await;
+
+    let outcome = upload::run(&[a, b], &cfg(&server.uri())).await.unwrap();
+    assert_eq!(outcome.files_uploaded, 2);
+    assert_eq!(outcome.upload_session_id, "upl_multi");
+    assert_eq!(
+        outcome.responses.len(),
+        1,
+        "one finalized session, not one per request"
+    );
+}
+
+/// A file too large for any POST joins the same session over MPU as the
+/// report it belongs with, instead of becoming an artifact-only session the
+/// dashboard would reject.
+#[tokio::test]
+async fn large_artifact_joins_the_reports_session_over_mpu() {
+    let server = MockServer::start().await;
+    let dir = TempDir::new().unwrap();
+    let trace = make_file(&dir, "trace.zip", 76 * 1024 * 1024);
+    let report = make_file(&dir, "report.xml", 2048);
+
+    mount_session(&server, "upl_multi", 1).await;
+    Mock::given(method("POST"))
+        .and(path("/api/upload/mpu/create"))
+        .and(body_partial_json(
+            json!({ "fileName": "trace.zip", "uploadSessionId": "upl_multi" }),
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "uploadId": "mpu_joined",
+            "uploadSessionId": "upl_multi",
+            "key": "k",
+            "partSize": 80 * 1024 * 1024,
+            "numParts": 1
+        })))
+        .expect(1)
+        .mount(&server)
+        .await;
+    Mock::given(method("PUT"))
+        .and(path("/api/upload/mpu/part"))
+        .and(query_param("uploadSessionId", "upl_multi"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_json(json!({ "partNumber": 1, "etag": "e1" })),
+        )
+        .expect(1)
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/api/upload/mpu/complete"))
+        .and(body_partial_json(
+            json!({ "uploadSessionId": "upl_multi", "uploadId": "mpu_joined" }),
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_json(append_response_body("upl_multi")))
+        .expect(1)
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/api/upload"))
+        .and(header("x-gaffer-upload-session", "upl_multi"))
+        .respond_with(V1CeilingServer {
+            ceiling: upload::V1_UPLOAD_CEILING_BYTES,
+        })
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let outcome = upload::run(&[trace, report], &cfg(&server.uri()))
+        .await
+        .unwrap();
+    assert_eq!(outcome.upload_session_id, "upl_multi");
+    assert_eq!(outcome.files_uploaded, 2);
+}
+
+/// A lower-ceiling 413 on an append re-plans that bundle into the SAME
+/// session: the dashboard leaves the session open across that rejection.
+#[tokio::test]
+async fn append_413_replans_within_the_same_session() {
+    let server = MockServer::start().await;
+    let dir = TempDir::new().unwrap();
+    let a = make_file(&dir, "a.xml", 40 * 1024 * 1024);
+    let b = make_file(&dir, "b.xml", 40 * 1024 * 1024);
+    // A server whose real ceiling (30 MiB) is lower than the client's: each
+    // 40 MiB bundle is rejected once, and at 30 MiB its file can only go
+    // over MPU, joined to the same session.
+    let lower = 30 * 1024 * 1024;
+
+    mount_session(&server, "upl_multi", 1).await;
+    Mock::given(method("POST"))
+        .and(path("/api/upload/mpu/create"))
+        .and(body_partial_json(json!({ "uploadSessionId": "upl_multi" })))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "uploadId": "mpu_replan",
+            "uploadSessionId": "upl_multi",
+            "key": "k",
+            "partSize": 50 * 1024 * 1024,
+            "numParts": 1
+        })))
+        .expect(2)
+        .mount(&server)
+        .await;
+    Mock::given(method("PUT"))
+        .and(path("/api/upload/mpu/part"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_json(json!({ "partNumber": 1, "etag": "e1" })),
+        )
+        .expect(2)
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/api/upload/mpu/complete"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(append_response_body("upl_multi")))
+        .expect(2)
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/api/upload"))
+        .and(header("x-gaffer-upload-session", "upl_multi"))
+        .respond_with(V1CeilingServer { ceiling: lower })
+        .expect(2)
+        .mount(&server)
+        .await;
+
+    let outcome = upload::run(&[a, b], &cfg(&server.uri())).await.unwrap();
+    assert_eq!(outcome.upload_session_id, "upl_multi");
+}
+
+/// A failure part-way through names the session, so support can find the
+/// half-received upload (the dashboard's stale-receiving sweep closes it).
+#[tokio::test]
+async fn mid_session_failure_reports_the_session_id() {
+    let server = MockServer::start().await;
+    let dir = TempDir::new().unwrap();
+    let a = make_file(&dir, "a.xml", 40 * 1024 * 1024);
+    let b = make_file(&dir, "b.xml", 40 * 1024 * 1024);
+
+    Mock::given(method("POST"))
+        .and(path("/api/upload/session"))
+        .respond_with(
+            ResponseTemplate::new(201).set_body_json(json!({ "uploadSessionId": "upl_multi" })),
+        )
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/api/upload"))
+        .respond_with(ResponseTemplate::new(400).set_body_json(json!({
+            "statusMessage": "Invalid filename provided",
+            "data": { "reason": "invalid_filename" },
+        })))
+        .mount(&server)
+        .await;
+
+    let err = upload::run(&[a, b], &cfg(&server.uri())).await.unwrap_err();
+    match err {
+        upload::UploadError::ServerError {
+            upload_session_id, ..
+        } => {
+            assert_eq!(upload_session_id.as_deref(), Some("upl_multi"));
+        }
+        other => panic!("expected a server error, got {:?}", other),
+    }
+}
+
+/// GAF-255. Before the fix a 413 was terminal: the CLI discarded the
+/// `ceiling` the server stated and failed the run with `file_too_large` and a
+/// fix hint about a 5 GB MPU limit that had nothing to do with the rejection.
+/// Now the stated ceiling re-plans the bundle, so the upload lands.
+#[tokio::test]
+async fn v1_ceiling_413_replans_the_bundle_through_mpu() {
+    let server = MockServer::start().await;
+    let dir = TempDir::new().unwrap();
+    let report = make_file(&dir, "report.xml", 2048);
+
+    // The dashboard's real envelope for `file_too_large_for_v1`
+    // (apps/dashboard/server/api/upload/index.post.ts). A deliberately tiny
+    // ceiling keeps the fixture small while still being *lower* than the
+    // client's default, which is what triggers the re-plan.
+    Mock::given(method("POST"))
+        .and(path("/api/upload"))
+        .respond_with(ResponseTemplate::new(413).set_body_json(json!({
+            "statusMessage": "File exceeds maximum size of 75MB",
+            "data": {
+                "reason": "file_too_large_for_v1",
+                "uploadSessionId": "upl_413",
+                "cfRayId": null,
+                "migration": "https://gaffer.sh/install.sh",
+                "ceiling": 1024,
+                "declaredSize": 3000,
+            },
+        })))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    Mock::given(method("POST"))
+        .and(path("/api/upload/mpu/create"))
+        .and(body_partial_json(json!({ "fileName": "report.xml", "fileSize": 2048 })))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "uploadId": "mpu_replan",
+            "uploadSessionId": "upl_replan",
+            "key": "k",
+            "partSize": 5 * 1024 * 1024,
+            "numParts": 1
+        })))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    Mock::given(method("PUT"))
+        .and(path("/api/upload/mpu/part"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "partNumber": 1,
+            "etag": "e1",
+        })))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    Mock::given(method("POST"))
+        .and(path("/api/upload/mpu/complete"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(upload_response_body("upl_replan")))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let outcome = upload::run(&[report], &cfg(&server.uri())).await.unwrap();
+    assert_eq!(outcome.upload_session_id, "upl_replan");
+    assert_eq!(outcome.files_uploaded, 1);
+}
+
+/// A 413 with no `ceiling` in its envelope (a proxy's own 413, say) has
+/// nothing to re-plan against. It must surface rather than loop.
+#[tokio::test]
+async fn bare_413_surfaces_without_replanning() {
+    let server = MockServer::start().await;
+    let dir = TempDir::new().unwrap();
+    let report = make_file(&dir, "report.xml", 2048);
+
+    Mock::given(method("POST"))
+        .and(path("/api/upload"))
+        .respond_with(ResponseTemplate::new(413).set_body_string("413 Payload Too Large"))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let err = upload::run(&[report], &cfg(&server.uri())).await.unwrap_err();
+    assert_eq!(err.kind(), "file_too_large", "got: {:?}", err);
+}
+
+/// A 413 whose ceiling is *not* lower than ours is a disagreement we can't
+/// route around — re-planning at the same number would send the same request.
+#[tokio::test]
+async fn equal_or_higher_ceiling_does_not_replan() {
+    let server = MockServer::start().await;
+    let dir = TempDir::new().unwrap();
+    let report = make_file(&dir, "report.xml", 2048);
+
+    Mock::given(method("POST"))
+        .and(path("/api/upload"))
+        .respond_with(ResponseTemplate::new(413).set_body_json(json!({
+            "statusMessage": "too large",
+            "data": { "ceiling": upload::V1_UPLOAD_CEILING_BYTES },
+        })))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let err = upload::run(&[report], &cfg(&server.uri())).await.unwrap_err();
+    assert_eq!(err.kind(), "file_too_large", "got: {:?}", err);
+    assert_eq!(err.ceiling(), Some(upload::V1_UPLOAD_CEILING_BYTES));
+}
+
+/// Client attribution headers the dashboard reads for upload analytics
+/// (`gaffer-client`, `gaffer-client-version`) and the audit log
+/// (`X-Gaffer-Source`). All three were absent before GAF-255, and the
+/// `User-Agent` reported gaffer-core's version rather than the CLI's.
+#[tokio::test]
+async fn sends_client_attribution_headers() {
+    let server = MockServer::start().await;
+    let dir = TempDir::new().unwrap();
+    let report = make_file(&dir, "report.xml", 1024);
+
+    Mock::given(method("POST"))
+        .and(path("/api/upload"))
+        .and(header("gaffer-client", "gaffer-cli"))
+        .and(header("gaffer-client-version", "9.9.9-test"))
+        .and(header("X-Gaffer-Source", "cli"))
+        .and(header("User-Agent", "gaffer-cli/9.9.9-test"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(upload_response_body("upl_hdr")))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let outcome = upload::run(&[report], &cfg(&server.uri())).await.unwrap();
+    assert_eq!(outcome.upload_session_id, "upl_hdr");
 }
 
 #[tokio::test]

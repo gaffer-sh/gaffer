@@ -1,0 +1,70 @@
+{
+  "_fixtureProvenance": "Hand-constructed, not captured from a live `vitest run` -- see GAF-211. Exercises the 14th top-level key (coverageMap) that Vitest's JSON reporter adds when `test.coverage.enabled` is true, using Istanbul's libCoverage FileCoverageData shape for the one covered file.",
+  "numTotalTestSuites": 1,
+  "numPassedTestSuites": 1,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 1,
+  "numPassedTests": 1,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "didUpdate": false,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0
+  },
+  "startTime": 1764894139853,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Calculator", "add"],
+          "fullName": "Calculator add should add two positive numbers",
+          "status": "passed",
+          "title": "should add two positive numbers",
+          "duration": 1.27,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1764894140126,
+      "endTime": 1764894140630,
+      "status": "passed",
+      "message": "",
+      "name": "/home/runner/work/project/tests/calculator.test.ts"
+    }
+  ],
+  "coverageMap": {
+    "/home/runner/work/project/src/calculator.ts": {
+      "path": "/home/runner/work/project/src/calculator.ts",
+      "statementMap": {
+        "0": { "start": { "line": 1, "column": 0 }, "end": { "line": 1, "column": 40 } },
+        "1": { "start": { "line": 2, "column": 2 }, "end": { "line": 2, "column": 20 } }
+      },
+      "fnMap": {
+        "0": {
+          "name": "add",
+          "decl": { "start": { "line": 1, "column": 16 }, "end": { "line": 1, "column": 19 } },
+          "loc": { "start": { "line": 1, "column": 29 }, "end": { "line": 3, "column": 1 } }
+        }
+      },
+      "branchMap": {},
+      "s": { "0": 1, "1": 1 },
+      "f": { "0": 1 },
+      "b": {}
+    }
+  }
+}
