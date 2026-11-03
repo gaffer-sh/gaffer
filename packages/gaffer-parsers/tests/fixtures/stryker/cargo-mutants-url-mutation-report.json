@@ -1,0 +1,1203 @@
+{
+  "schemaVersion": "2",
+  "files": {
+    "url/src/path_segments.rs": {
+      "language": "rust",
+      "mutants": [
+        {
+          "id": "url/src/path_segments.rs:141:9:150:13:FnValue:Box::leak(Box::new(Default::default()))",
+          "duration": 5.31898098,
+          "mutatorName": "FnValue",
+          "location": {
+            "start": {
+              "line": 141,
+              "column": 9
+            },
+            "end": {
+              "line": 150,
+              "column": 13
+            }
+          },
+          "replacement": "Box::leak(Box::new(Default::default()))",
+          "status": "CompileError",
+          "description": "Replace FnValue by Box::leak(Box::new(Default::default()))",
+          "killedBy": []
+        },
+        {
+          "id": "url/src/path_segments.rs:149:46:149:47:BinaryOperator:-",
+          "duration": 2.041649526,
+          "mutatorName": "BinaryOperator",
+          "location": {
+            "start": {
+              "line": 149,
+              "column": 46
+            },
+            "end": {
+              "line": 149,
+              "column": 47
+            }
+          },
+          "replacement": "-",
+          "status": "Killed",
+          "description": "Replace BinaryOperator by -",
+          "statusReason": "thread 'append_empty_segment_then_mutate' panicked at url/tests/unit.rs:496:28:\ncalled `Result::unwrap()` on an `Err` value: \"97 != 58 (self.byte_at(self.host_end) != b':') for URL \\\"http://localhos?a=b\\\"\"\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n",
+          "killedBy": [
+            "append_empty_segment_then_mutate"
+          ]
+        },
+        {
+          "id": "url/src/path_segments.rs:67:9:68:80:FnValue:()",
+          "duration": 1.818075437,
+          "mutatorName": "FnValue",
+          "location": {
+            "start": {
+              "line": 67,
+              "column": 9
+            },
+            "end": {
+              "line": 68,
+              "column": 80
+            }
+          },
+          "replacement": "()",
+          "status": "Killed",
+          "description": "Replace FnValue by ()",
+          "statusReason": "thread 'append_trailing_slash' panicked at url/tests/unit.rs:467:28:\ncalled `Result::unwrap()` on an `Err` value: \"47 != 63 (self.byte_at(start) != b'?') for URL \\\"http://localhost:6767/foo/bar/\\\"\"\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n",
+          "killedBy": [
+            "append_trailing_slash",
+            "extend_query_pairs_then_mutate",
+            "append_empty_segment_then_mutate"
+          ]
+        },
+        {
+          "id": "url/src/path_segments.rs:229:60:229:61:BinaryOperator:-",
+          "duration": 2.766015688,
+          "mutatorName": "BinaryOperator",
+          "location": {
+            "start": {
+              "line": 229,
+              "column": 60
+            },
+            "end": {
+              "line": 229,
+              "column": 61
+            }
+          },
+          "replacement": "-",
+          "status": "Killed",
+          "description": "Replace BinaryOperator by -",
+          "statusReason": "thread 'path_backslash_fun' panicked at url/tests/unit.rs:215:5:\nassertion `left == right` failed\n  left: \"http://foobar.com//foo%5Cbar\"\n right: \"http://foobar.com/foo%5Cbar\"\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n",
+          "killedBy": [
+            "path_backslash_fun"
+          ]
+        },
+        {
+          "id": "url/src/path_segments.rs:126:35:126:37:BinaryOperator:<",
+          "duration": 1.833961155,
+          "mutatorName": "BinaryOperator",
+          "location": {
+            "start": {
+              "line": 126,
+              "column": 35
+            },
+            "end": {
+              "line": 126,
+              "column": 37
+            }
+          },
+          "replacement": "<",
+          "status": "Killed",
+          "description": "Replace BinaryOperator by <",
+          "statusReason": "thread 'pop_if_empty_in_bounds' panicked at url/src/path_segments.rs:129:34:\nbyte index 5 is out of bounds of `m://`\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n",
+          "killedBy": [
+            "pop_if_empty_in_bounds"
+          ]
+        },
+        {
+          "id": "url/src/path_segments.rs:149:46:149:47:BinaryOperator:*",
+          "duration": 0.654870955,
+          "mutatorName": "BinaryOperator",
+          "location": {
+            "start": {
+              "line": 149,
+              "column": 46
+            },
+            "end": {
+              "line": 149,
+              "column": 47
+            }
+          },
+          "replacement": "*",
+          "status": "Killed",
+          "description": "Replace BinaryOperator by *",
+          "statusReason": "thread 'append_empty_segment_then_mutate' panicked at url/tests/unit.rs:497:5:\nassertion `left == right` failed\n  left: \"http://localhost:6767/foo/bar/?a=b\"\n right: \"http://localhost:6767/foo/bar?a=b\"\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n",
+          "killedBy": [
+            "append_empty_segment_then_mutate"
+          ]
+        },
+        {
+          "id": "url/src/path_segments.rs:141:35:141:37:BinaryOperator:<",
+          "duration": 1.7625718670000001,
+          "mutatorName": "BinaryOperator",
+          "location": {
+            "start": {
+              "line": 141,
+              "column": 35
+            },
+            "end": {
+              "line": 141,
+              "column": 37
+            }
+          },
+          "replacement": "<",
+          "status": "Killed",
+          "description": "Replace BinaryOperator by <",
+          "statusReason": "thread 'append_empty_segment_then_mutate' panicked at url/tests/unit.rs:497:5:\nassertion `left == right` failed\n  left: \"http://localhost:6767/foo/bar/?a=b\"\n right: \"http://localhost:6767/foo/bar?a=b\"\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n",
+          "killedBy": [
+            "append_empty_segment_then_mutate",
+            "pop_if_empty_in_bounds"
+          ]
+        },
+        {
+          "id": "url/src/path_segments.rs:93:9:94:13:FnValue:Box::leak(Box::new(Default::default()))",
+          "duration": 0.151927735,
+          "mutatorName": "FnValue",
+          "location": {
+            "start": {
+              "line": 93,
+              "column": 9
+            },
+            "end": {
+              "line": 94,
+              "column": 13
+            }
+          },
+          "replacement": "Box::leak(Box::new(Default::default()))",
+          "status": "CompileError",
+          "description": "Replace FnValue by Box::leak(Box::new(Default::default()))",
+          "killedBy": []
+        },
+        {
+          "id": "url/src/path_segments.rs:159:9:159:35:FnValue:Box::leak(Box::new(Default::default()))",
+          "duration": 0.517703306,
+          "mutatorName": "FnValue",
+          "location": {
+            "start": {
+              "line": 159,
+              "column": 9
+            },
+            "end": {
+              "line": 159,
+              "column": 35
+            }
+          },
+          "replacement": "Box::leak(Box::new(Default::default()))",
+          "status": "CompileError",
+          "description": "Replace FnValue by Box::leak(Box::new(Default::default()))",
+          "killedBy": []
+        },
+        {
+          "id": "url/src/path_segments.rs:229:60:229:61:BinaryOperator:*",
+          "duration": 2.3300128570000003,
+          "mutatorName": "BinaryOperator",
+          "location": {
+            "start": {
+              "line": 229,
+              "column": 60
+            },
+            "end": {
+              "line": 229,
+              "column": 61
+            }
+          },
+          "replacement": "*",
+          "status": "Killed",
+          "description": "Replace BinaryOperator by *",
+          "statusReason": "thread 'path_backslash_fun' panicked at url/tests/unit.rs:215:5:\nassertion `left == right` failed\n  left: \"http://foobar.com//foo%5Cbar\"\n right: \"http://foobar.com/foo%5Cbar\"\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n",
+          "killedBy": [
+            "path_backslash_fun"
+          ]
+        },
+        {
+          "id": "url/src/path_segments.rs:229:47:229:48:BinaryOperator:==",
+          "duration": 1.181715359,
+          "mutatorName": "BinaryOperator",
+          "location": {
+            "start": {
+              "line": 229,
+              "column": 47
+            },
+            "end": {
+              "line": 229,
+              "column": 48
+            }
+          },
+          "replacement": "==",
+          "status": "Killed",
+          "description": "Replace BinaryOperator by ==",
+          "statusReason": "thread 'path_backslash_fun' panicked at url/tests/unit.rs:215:5:\nassertion `left == right` failed\n  left: \"http://foobar.com//foo%5Cbar\"\n right: \"http://foobar.com/foo%5Cbar\"\n",
+          "killedBy": [
+            "path_backslash_fun",
+            "append_trailing_slash",
+            "extend_query_pairs_then_mutate",
+            "append_empty_segment_then_mutate"
+          ]
+        },
+        {
+          "id": "url/src/path_segments.rs:58:52:58:53:BinaryOperator:*",
+          "duration": 4.68427692,
+          "mutatorName": "BinaryOperator",
+          "location": {
+            "start": {
+              "line": 58,
+              "column": 52
+            },
+            "end": {
+              "line": 58,
+              "column": 53
+            }
+          },
+          "replacement": "*",
+          "status": "Survived",
+          "description": "Replace BinaryOperator by *",
+          "killedBy": []
+        },
+        {
+          "id": "url/src/path_segments.rs:229:47:229:48:BinaryOperator:<",
+          "duration": 1.669357076,
+          "mutatorName": "BinaryOperator",
+          "location": {
+            "start": {
+              "line": 229,
+              "column": 47
+            },
+            "end": {
+              "line": 229,
+              "column": 48
+            }
+          },
+          "replacement": "<",
+          "status": "Killed",
+          "description": "Replace BinaryOperator by <",
+          "statusReason": "thread 'extend_query_pairs_then_mutate' panicked at url/tests/unit.rs:484:5:\nassertion `left == right` failed\n  left: \"http://localhost:6767/foo/barsome_other_path?auth=my-token\"\n right: \"http://localhost:6767/foo/bar/some_other_path?auth=my-token\"\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n",
+          "killedBy": [
+            "extend_query_pairs_then_mutate",
+            "append_empty_segment_then_mutate",
+            "append_trailing_slash"
+          ]
+        },
+        {
+          "id": "url/src/path_segments.rs:46:5:62:6:FnValue:Default::default()",
+          "duration": 0.519678983,
+          "mutatorName": "FnValue",
+          "location": {
+            "start": {
+              "line": 46,
+              "column": 5
+            },
+            "end": {
+              "line": 62,
+              "column": 6
+            }
+          },
+          "replacement": "Default::default()",
+          "status": "CompileError",
+          "description": "Replace FnValue by Default::default()",
+          "killedBy": []
+        },
+        {
+          "id": "url/src/path_segments.rs:231:21:231:23:BinaryOperator:&&",
+          "duration": 0.9099738749999999,
+          "mutatorName": "BinaryOperator",
+          "location": {
+            "start": {
+              "line": 231,
+              "column": 21
+            },
+            "end": {
+              "line": 231,
+              "column": 23
+            }
+          },
+          "replacement": "&&",
+          "status": "Killed",
+          "description": "Replace BinaryOperator by &&",
+          "statusReason": "thread 'append_empty_segment_then_mutate' panicked at url/tests/unit.rs:497:5:\nassertion `left == right` failed\n  left: \"http://localhost:6767/foo?a=b\"\n right: \"http://localhost:6767/foo/bar?a=b\"\n",
+          "killedBy": [
+            "append_empty_segment_then_mutate",
+            "extend_query_pairs_then_mutate",
+            "append_trailing_slash",
+            "path_backslash_fun"
+          ]
+        },
+        {
+          "id": "url/src/path_segments.rs:58:52:58:53:BinaryOperator:-",
+          "duration": 2.307293589,
+          "mutatorName": "BinaryOperator",
+          "location": {
+            "start": {
+              "line": 58,
+              "column": 52
+            },
+            "end": {
+              "line": 58,
+              "column": 53
+            }
+          },
+          "replacement": "-",
+          "status": "Killed",
+          "description": "Replace BinaryOperator by -",
+          "statusReason": "Test executable failed (exit status: 101).\n\nstderr:\nthread 'main' panicked at url/src/path_segments.rs:12:1:\nassertion `left == right` failed\n  left: \"https://github.cologout\"\n right: \"https://github.com/logout\"\nstack backtrace:\n   0:     0x55e9032b5266 - std::backtrace_rs::backtrace::libunwind::trace::h5aa1f3f50fd6005d\n                               at /rustc/bccb9bbb418a30aeb332052e721beb6ebc6b1ce7/library/std/src/../../backtrace/src/backtrace/libunwind.rs:104:5\n   1:     0x55e9032b5266 - std::backtrace_rs::backtrace::trace_unsynchronized::h39f759d0ceaa839b\n                               at /rustc/bccb9bbb418a30aeb332052e721beb6ebc6b1ce7/library/std/src/../../backtrace/src/backtrace/mod.rs:66:5\n   2:     0x55e9032b5266 - std::sys_common::backtrace::_print_fmt::hfd4aa038a1413f7f\n                               at /rustc/bccb9bbb418a30aeb332052e721beb6ebc6b1ce7/library/std/src/sys_common/backtrace.rs:68:5\n   3:     0x55e9032b5266 - <std::sys_common::backtrace::_print::DisplayBacktrace as core::fmt::Display>::fmt::ha47fba1de44cec55\n                               at /rustc/bccb9bbb418a30aeb332052e721beb6ebc6b1ce7/library/std/src/sys_common/backtrace.rs:44:22\n   4:     0x55e9032d2d0c - core::fmt::rt::Argument::fmt::h375396e1292b08cb\n                               at /rustc/bccb9bbb418a30aeb332052e721beb6ebc6b1ce7/library/core/src/fmt/rt.rs:142:9\n   5:     0x55e9032d2d0c - core::fmt::write::h93e0b545aa9eb320\n                               at /rustc/bccb9bbb418a30aeb332052e721beb6ebc6b1ce7/library/core/src/fmt/mod.rs:1120:17\n   6:     0x55e9032b347f - std::io::Write::write_fmt::h97fad0674ecdf154\n                               at /rustc/bccb9bbb418a30aeb332052e721beb6ebc6b1ce7/library/std/src/io/mod.rs:1854:15\n   7:     0x55e9032b5014 - std::sys_common::backtrace::_print::hb7626a1b4ea382df\n                               at /rustc/bccb9bbb418a30aeb332052e721beb6ebc6b1ce7/library/std/src/sys_common/backtrace.rs:47:5\n   8:     0x55e9032b5014 - std::sys_common::backtrace::print::h89f2abc5b98b82a2\n                               at /rustc/bccb9bbb418a30aeb332052e721beb6ebc6b1ce7/library/std/src/sys_common/backtrace.rs:34:9\n   9:     0x55e9032b650b - std::panicking::default_hook::{{closure}}::h73fe684137831048\n  10:     0x55e9032b6259 - std::panicking::default_hook::h8dfe6e62b35915a0\n                               at /rustc/bccb9bbb418a30aeb332052e721beb6ebc6b1ce7/library/std/src/panicking.rs:292:9\n  11:     0x55e9032b69ad - std::panicking::rust_panic_with_hook::hc33e259baf535986\n                               at /rustc/bccb9bbb418a30aeb332052e721beb6ebc6b1ce7/library/std/src/panicking.rs:781:13\n  12:     0x55e9032b6882 - std::panicking::begin_panic_handler::{{closure}}::hcfbf8e29c9418131\n                               at /rustc/bccb9bbb418a30aeb332052e721beb6ebc6b1ce7/library/std/src/panicking.rs:659:13\n  13:     0x55e9032b5746 - std::sys_common::backtrace::__rust_end_short_backtrace::h99b80dfa4797f5b6\n                               at /rustc/bccb9bbb418a30aeb332052e721beb6ebc6b1ce7/library/std/src/sys_common/backtrace.rs:171:18\n  14:     0x55e9032b65b4 - rust_begin_unwind\n                               at /rustc/bccb9bbb418a30aeb332052e721beb6ebc6b1ce7/library/std/src/panicking.rs:647:5\n  15:     0x55e903250cf5 - core::panicking::panic_fmt::h96700527d99a56a9\n                               at /rustc/bccb9bbb418a30aeb332052e721beb6ebc6b1ce7/library/core/src/panicking.rs:72:14\n  16:     0x55e903250ffb - core::panicking::assert_failed_inner::h88ed53873568fcef\n                               at /rustc/bccb9bbb418a30aeb332052e721beb6ebc6b1ce7/library/core/src/panicking.rs:342:17\n  17:     0x55e90325183a - core::panicking::assert_failed::h03f34daddd0b0bf6\n  18:     0x55e903252409 - rust_out::main::_doctest_main_url_src_path_segments_rs_79_0::run::ha32ed3084befe4e3\n  19:     0x55e903251ff9 - rust_out::main::_doctest_main_url_src_path_segments_rs_79_0::h46c77791cc99e455\n  20:     0x55e903251fe6 - rust_out::main::h11d1a6ed4289a3df\n  21:     0x55e9032515b3 - core::ops::function::FnOnce::call_once::h903f19ac3af5d648\n  22:     0x55e9032514b6 - std::sys_common::backtrace::__rust_begin_short_backtrace::ha11011b11b4aaa1f\n  23:     0x55e903251509 - std::rt::lang_start::{{closure}}::h196360a935ed97d8\n  24:     0x55e9032b1783 - core::ops::function::impls::<impl core::ops::function::FnOnce<A> for &F>::call_once::hb12a069c52b9e638\n                               at /rustc/bccb9bbb418a30aeb332052e721beb6ebc6b1ce7/library/core/src/ops/function.rs:284:13\n  25:     0x55e9032b1783 - std::panicking::try::do_call::h34ba557680a1662c\n                               at /rustc/bccb9bbb418a30aeb332052e721beb6ebc6b1ce7/library/std/src/panicking.rs:554:40\n  26:     0x55e9032b1783 - std::panicking::try::hb88778117e3deeb6\n                               at /rustc/bccb9bbb418a30aeb332052e721beb6ebc6b1ce7/library/std/src/panicking.rs:518:19\n  27:     0x55e9032b1783 - std::panic::catch_unwind::hbd3c1fafc0d9693e\n                               at /rustc/bccb9bbb418a30aeb332052e721beb6ebc6b1ce7/library/std/src/panic.rs:142:14\n  28:     0x55e9032b1783 - std::rt::lang_start_internal::{{closure}}::h0b81b8de0028b6f3\n                               at /rustc/bccb9bbb418a30aeb332052e721beb6ebc6b1ce7/library/std/src/rt.rs:148:48\n  29:     0x55e9032b1783 - std::panicking::try::do_call::hbbb521b5391ac872\n                               at /rustc/bccb9bbb418a30aeb332052e721beb6ebc6b1ce7/library/std/src/panicking.rs:554:40\n  30:     0x55e9032b1783 - std::panicking::try::hf108a0b7deb842f7\n                               at /rustc/bccb9bbb418a30aeb332052e721beb6ebc6b1ce7/library/std/src/panicking.rs:518:19\n  31:     0x55e9032b1783 - std::panic::catch_unwind::h6451f9c53324fd81\n                               at /rustc/bccb9bbb418a30aeb332052e721beb6ebc6b1ce7/library/std/src/panic.rs:142:14\n  32:     0x55e9032b1783 - std::rt::lang_start_internal::hc6ad905f9af5ea03\n                               at /rustc/bccb9bbb418a30aeb332052e721beb6ebc6b1ce7/library/std/src/rt.rs:148:20\n  33:     0x55e9032514e7 - std::rt::lang_start::h4d1167809e102347\n  34:     0x55e903252495 - main\n  35:     0x7f86dd3a1cd0 - <unknown>\n  36:     0x7f86dd3a1d8a - __libc_start_main\n  37:     0x55e903251315 - _start\n  38:                0x0 - <unknown>\n\n",
+          "killedBy": [
+            "url/src/path_segments.rs - path_segments::PathSegmentsMut<'a>::clear (line 79)"
+          ]
+        },
+        {
+          "id": "url/src/path_segments.rs:220:9:244:13:FnValue:Box::leak(Box::new(Default::default()))",
+          "duration": 0.462674228,
+          "mutatorName": "FnValue",
+          "location": {
+            "start": {
+              "line": 220,
+              "column": 9
+            },
+            "end": {
+              "line": 244,
+              "column": 13
+            }
+          },
+          "replacement": "Box::leak(Box::new(Default::default()))",
+          "status": "CompileError",
+          "description": "Replace FnValue by Box::leak(Box::new(Default::default()))",
+          "killedBy": []
+        },
+        {
+          "id": "url/src/path_segments.rs:126:9:132:13:FnValue:Box::leak(Box::new(Default::default()))",
+          "duration": 0.960170318,
+          "mutatorName": "FnValue",
+          "location": {
+            "start": {
+              "line": 126,
+              "column": 9
+            },
+            "end": {
+              "line": 132,
+              "column": 13
+            }
+          },
+          "replacement": "Box::leak(Box::new(Default::default()))",
+          "status": "CompileError",
+          "description": "Replace FnValue by Box::leak(Box::new(Default::default()))",
+          "killedBy": []
+        },
+        {
+          "id": "url/src/path_segments.rs:231:51:231:53:BinaryOperator:!=",
+          "duration": 3.084160921,
+          "mutatorName": "BinaryOperator",
+          "location": {
+            "start": {
+              "line": 231,
+              "column": 51
+            },
+            "end": {
+              "line": 231,
+              "column": 53
+            }
+          },
+          "replacement": "!=",
+          "status": "Killed",
+          "description": "Replace BinaryOperator by !=",
+          "statusReason": "thread 'path_backslash_fun' panicked at url/tests/unit.rs:215:5:\nassertion `left == right` failed\n  left: \"http://foobar.com//foo%5Cbar\"\n right: \"http://foobar.com/foo%5Cbar\"\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n",
+          "killedBy": [
+            "path_backslash_fun"
+          ]
+        }
+      ],
+      "source": "// Copyright 2016 The rust-url developers.\n//\n// Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or\n// http://www.apache.org/licenses/LICENSE-2.0> or the MIT license\n// <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your\n// option. This file may not be copied, modified, or distributed\n// except according to those terms.\n\nuse crate::parser::{self, to_u32, SchemeType};\nuse crate::Url;\nuse std::str;\n\n/// Exposes methods to manipulate the path of an URL that is not cannot-be-base.\n///\n/// The path always starts with a `/` slash, and is made of slash-separated segments.\n/// There is always at least one segment (which may be the empty string).\n///\n/// Examples:\n///\n/// ```rust\n/// use url::Url;\n/// # use std::error::Error;\n///\n/// # fn run() -> Result<(), Box<dyn Error>> {\n/// let mut url = Url::parse(\"mailto:me@example.com\")?;\n/// assert!(url.path_segments_mut().is_err());\n///\n/// let mut url = Url::parse(\"http://example.net/foo/index.html\")?;\n/// url.path_segments_mut().map_err(|_| \"cannot be base\")?\n///     .pop().push(\"img\").push(\"2/100%.png\");\n/// assert_eq!(url.as_str(), \"http://example.net/foo/img/2%2F100%25.png\");\n/// # Ok(())\n/// # }\n/// # run().unwrap();\n/// ```\n#[derive(Debug)]\npub struct PathSegmentsMut<'a> {\n    url: &'a mut Url,\n    after_first_slash: usize,\n    after_path: String,\n    old_after_path_position: u32,\n}\n\n// Not re-exported outside the crate\npub fn new(url: &mut Url) -> PathSegmentsMut<'_> {\n    let after_path = url.take_after_path();\n    let old_after_path_position = to_u32(url.serialization.len()).unwrap();\n    // Special urls always have a non empty path\n    if SchemeType::from(url.scheme()).is_special() {\n        debug_assert!(url.byte_at(url.path_start) == b'/');\n    } else {\n        debug_assert!(\n            url.serialization.len() == url.path_start as usize\n                || url.byte_at(url.path_start) == b'/'\n        );\n    }\n    PathSegmentsMut {\n        after_first_slash: url.path_start as usize + \"/\".len(),\n        url,\n        old_after_path_position,\n        after_path,\n    }\n}\n\nimpl<'a> Drop for PathSegmentsMut<'a> {\n    fn drop(&mut self) {\n        self.url\n            .restore_after_path(self.old_after_path_position, &self.after_path)\n    }\n}\n\nimpl<'a> PathSegmentsMut<'a> {\n    /// Remove all segments in the path, leaving the minimal `url.path() == \"/\"`.\n    ///\n    /// Returns `&mut Self` so that method calls can be chained.\n    ///\n    /// Example:\n    ///\n    /// ```rust\n    /// use url::Url;\n    /// # use std::error::Error;\n    ///\n    /// # fn run() -> Result<(), Box<dyn Error>> {\n    /// let mut url = Url::parse(\"https://github.com/servo/rust-url/\")?;\n    /// url.path_segments_mut().map_err(|_| \"cannot be base\")?\n    ///     .clear().push(\"logout\");\n    /// assert_eq!(url.as_str(), \"https://github.com/logout\");\n    /// # Ok(())\n    /// # }\n    /// # run().unwrap();\n    /// ```\n    pub fn clear(&mut self) -> &mut Self {\n        self.url.serialization.truncate(self.after_first_slash);\n        self\n    }\n\n    /// Remove the last segment of this URL’s path if it is empty,\n    /// except if these was only one segment to begin with.\n    ///\n    /// In other words, remove one path trailing slash, if any,\n    /// unless it is also the initial slash (so this does nothing if `url.path() == \"/\")`.\n    ///\n    /// Returns `&mut Self` so that method calls can be chained.\n    ///\n    /// Example:\n    ///\n    /// ```rust\n    /// use url::Url;\n    /// # use std::error::Error;\n    ///\n    /// # fn run() -> Result<(), Box<dyn Error>> {\n    /// let mut url = Url::parse(\"https://github.com/servo/rust-url/\")?;\n    /// url.path_segments_mut().map_err(|_| \"cannot be base\")?\n    ///     .push(\"pulls\");\n    /// assert_eq!(url.as_str(), \"https://github.com/servo/rust-url//pulls\");\n    ///\n    /// let mut url = Url::parse(\"https://github.com/servo/rust-url/\")?;\n    /// url.path_segments_mut().map_err(|_| \"cannot be base\")?\n    ///     .pop_if_empty().push(\"pulls\");\n    /// assert_eq!(url.as_str(), \"https://github.com/servo/rust-url/pulls\");\n    /// # Ok(())\n    /// # }\n    /// # run().unwrap();\n    /// ```\n    pub fn pop_if_empty(&mut self) -> &mut Self {\n        if self.after_first_slash >= self.url.serialization.len() {\n            return self;\n        }\n        if self.url.serialization[self.after_first_slash..].ends_with('/') {\n            self.url.serialization.pop();\n        }\n        self\n    }\n\n    /// Remove the last segment of this URL’s path.\n    ///\n    /// If the path only has one segment, make it empty such that `url.path() == \"/\"`.\n    ///\n    /// Returns `&mut Self` so that method calls can be chained.\n    pub fn pop(&mut self) -> &mut Self {\n        if self.after_first_slash >= self.url.serialization.len() {\n            return self;\n        }\n        let last_slash = self.url.serialization[self.after_first_slash..]\n            .rfind('/')\n            .unwrap_or(0);\n        self.url\n            .serialization\n            .truncate(self.after_first_slash + last_slash);\n        self\n    }\n\n    /// Append the given segment at the end of this URL’s path.\n    ///\n    /// See the documentation for `.extend()`.\n    ///\n    /// Returns `&mut Self` so that method calls can be chained.\n    pub fn push(&mut self, segment: &str) -> &mut Self {\n        self.extend(Some(segment))\n    }\n\n    /// Append each segment from the given iterator at the end of this URL’s path.\n    ///\n    /// Each segment is percent-encoded like in `Url::parse` or `Url::join`,\n    /// except that `%` and `/` characters are also encoded (to `%25` and `%2F`).\n    /// This is unlike `Url::parse` where `%` is left as-is in case some of the input\n    /// is already percent-encoded, and `/` denotes a path segment separator.)\n    ///\n    /// Note that, in addition to slashes between new segments,\n    /// this always adds a slash between the existing path and the new segments\n    /// *except* if the existing path is `\"/\"`.\n    /// If the previous last segment was empty (if the path had a trailing slash)\n    /// the path after `.extend()` will contain two consecutive slashes.\n    /// If that is undesired, call `.pop_if_empty()` first.\n    ///\n    /// To obtain a behavior similar to `Url::join`, call `.pop()` unconditionally first.\n    ///\n    /// Returns `&mut Self` so that method calls can be chained.\n    ///\n    /// Example:\n    ///\n    /// ```rust\n    /// use url::Url;\n    /// # use std::error::Error;\n    ///\n    /// # fn run() -> Result<(), Box<dyn Error>> {\n    /// let mut url = Url::parse(\"https://github.com/\")?;\n    /// let org = \"servo\";\n    /// let repo = \"rust-url\";\n    /// let issue_number = \"188\";\n    /// url.path_segments_mut().map_err(|_| \"cannot be base\")?\n    ///     .extend(&[org, repo, \"issues\", issue_number]);\n    /// assert_eq!(url.as_str(), \"https://github.com/servo/rust-url/issues/188\");\n    /// # Ok(())\n    /// # }\n    /// # run().unwrap();\n    /// ```\n    ///\n    /// In order to make sure that parsing the serialization of an URL gives the same URL,\n    /// a segment is ignored if it is `\".\"` or `\"..\"`:\n    ///\n    /// ```rust\n    /// use url::Url;\n    /// # use std::error::Error;\n    ///\n    /// # fn run() -> Result<(), Box<dyn Error>> {\n    /// let mut url = Url::parse(\"https://github.com/servo\")?;\n    /// url.path_segments_mut().map_err(|_| \"cannot be base\")?\n    ///     .extend(&[\"..\", \"rust-url\", \".\", \"pulls\"]);\n    /// assert_eq!(url.as_str(), \"https://github.com/servo/rust-url/pulls\");\n    /// # Ok(())\n    /// # }\n    /// # run().unwrap();\n    /// ```\n    pub fn extend<I>(&mut self, segments: I) -> &mut Self\n    where\n        I: IntoIterator,\n        I::Item: AsRef<str>,\n    {\n        let scheme_type = SchemeType::from(self.url.scheme());\n        let path_start = self.url.path_start as usize;\n        self.url.mutate(|parser| {\n            parser.context = parser::Context::PathSegmentSetter;\n            for segment in segments {\n                let segment = segment.as_ref();\n                if matches!(segment, \".\" | \"..\") {\n                    continue;\n                }\n                if parser.serialization.len() > path_start + 1\n                    // Non special url's path might still be empty\n                    || parser.serialization.len() == path_start\n                {\n                    parser.serialization.push('/');\n                }\n                let mut has_host = true; // FIXME account for this?\n                parser.parse_path(\n                    scheme_type,\n                    &mut has_host,\n                    path_start,\n                    parser::Input::new_no_trim(segment),\n                );\n            }\n        });\n        self\n    }\n}\n"
+    },
+    "url/src/origin.rs": {
+      "language": "rust",
+      "mutants": [
+        {
+          "id": "url/src/origin.rs:76:9:85:10:FnValue:String::new()",
+          "duration": 2.5331689550000003,
+          "mutatorName": "FnValue",
+          "location": {
+            "start": {
+              "line": 76,
+              "column": 9
+            },
+            "end": {
+              "line": 85,
+              "column": 10
+            }
+          },
+          "replacement": "String::new()",
+          "status": "Killed",
+          "description": "Replace FnValue by String::new()",
+          "statusReason": "thread 'test_origin_unicode_serialization' panicked at url/tests/unit.rs:618:9:\nassertion `left == right` failed\n  left: \"\"\n right: \"http://example.net\"\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n",
+          "killedBy": [
+            "test_origin_unicode_serialization"
+          ]
+        },
+        {
+          "id": "url/src/origin.rs:79:41:79:43:BinaryOperator:!=",
+          "duration": 1.821119852,
+          "mutatorName": "BinaryOperator",
+          "location": {
+            "start": {
+              "line": 79,
+              "column": 41
+            },
+            "end": {
+              "line": 79,
+              "column": 43
+            }
+          },
+          "replacement": "!=",
+          "status": "Killed",
+          "description": "Replace BinaryOperator by !=",
+          "statusReason": "thread 'test_origin_unicode_serialization' panicked at url/tests/unit.rs:618:9:\nassertion `left == right` failed\n  left: \"http://example.net:80\"\n right: \"http://example.net\"\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n",
+          "killedBy": [
+            "test_origin_unicode_serialization"
+          ]
+        },
+        {
+          "id": "url/src/origin.rs:76:9:85:10:FnValue:\"xyzzy\".into()",
+          "duration": 3.089533978,
+          "mutatorName": "FnValue",
+          "location": {
+            "start": {
+              "line": 76,
+              "column": 9
+            },
+            "end": {
+              "line": 85,
+              "column": 10
+            }
+          },
+          "replacement": "\"xyzzy\".into()",
+          "status": "Killed",
+          "description": "Replace FnValue by \"xyzzy\".into()",
+          "statusReason": "thread 'test_origin_unicode_serialization' panicked at url/tests/unit.rs:618:9:\nassertion `left == right` failed\n  left: \"xyzzy\"\n right: \"http://example.net\"\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n",
+          "killedBy": [
+            "test_origin_unicode_serialization"
+          ]
+        },
+        {
+          "id": "url/src/origin.rs:90:9:106:10:FnValue:\"xyzzy\".into()",
+          "duration": 2.327778796,
+          "mutatorName": "FnValue",
+          "location": {
+            "start": {
+              "line": 90,
+              "column": 9
+            },
+            "end": {
+              "line": 106,
+              "column": 10
+            }
+          },
+          "replacement": "\"xyzzy\".into()",
+          "status": "Killed",
+          "description": "Replace FnValue by \"xyzzy\".into()",
+          "statusReason": "thread 'test_origin_unicode_serialization' panicked at url/tests/unit.rs:599:9:\nassertion `left == right` failed\n  left: \"xyzzy\"\n right: \"http://😅.com\"\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n",
+          "killedBy": [
+            "test_origin_unicode_serialization"
+          ]
+        },
+        {
+          "id": "url/src/origin.rs:15:5:32:6:FnValue:Default::default()",
+          "duration": 0.313646646,
+          "mutatorName": "FnValue",
+          "location": {
+            "start": {
+              "line": 15,
+              "column": 5
+            },
+            "end": {
+              "line": 32,
+              "column": 6
+            }
+          },
+          "replacement": "Default::default()",
+          "status": "CompileError",
+          "description": "Replace FnValue by Default::default()",
+          "killedBy": []
+        },
+        {
+          "id": "url/src/origin.rs:100:41:100:43:BinaryOperator:!=",
+          "duration": 0.915931049,
+          "mutatorName": "BinaryOperator",
+          "location": {
+            "start": {
+              "line": 100,
+              "column": 41
+            },
+            "end": {
+              "line": 100,
+              "column": 43
+            }
+          },
+          "replacement": "!=",
+          "status": "Killed",
+          "description": "Replace BinaryOperator by !=",
+          "statusReason": "thread 'test_origin_unicode_serialization' panicked at url/tests/unit.rs:599:9:\nassertion `left == right` failed\n  left: \"http://😅.com:80\"\n right: \"http://😅.com\"\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n",
+          "killedBy": [
+            "test_origin_unicode_serialization"
+          ]
+        },
+        {
+          "id": "url/src/origin.rs:71:9:71:43:FnValue:true",
+          "duration": 1.886974844,
+          "mutatorName": "FnValue",
+          "location": {
+            "start": {
+              "line": 71,
+              "column": 9
+            },
+            "end": {
+              "line": 71,
+              "column": 43
+            }
+          },
+          "replacement": "true",
+          "status": "Killed",
+          "description": "Replace FnValue by true",
+          "statusReason": "thread 'test_origin_opaque' panicked at url/tests/unit.rs:585:5:\nassertion failed: !Origin::new_opaque().is_tuple()\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n",
+          "killedBy": [
+            "test_origin_opaque"
+          ]
+        },
+        {
+          "id": "url/src/origin.rs:71:9:71:43:FnValue:false",
+          "duration": 4.241788549,
+          "mutatorName": "FnValue",
+          "location": {
+            "start": {
+              "line": 71,
+              "column": 9
+            },
+            "end": {
+              "line": 71,
+              "column": 43
+            }
+          },
+          "replacement": "false",
+          "status": "Survived",
+          "description": "Replace FnValue by false",
+          "killedBy": []
+        },
+        {
+          "id": "url/src/origin.rs:90:9:106:10:FnValue:String::new()",
+          "duration": 2.034750552,
+          "mutatorName": "FnValue",
+          "location": {
+            "start": {
+              "line": 90,
+              "column": 9
+            },
+            "end": {
+              "line": 106,
+              "column": 10
+            }
+          },
+          "replacement": "String::new()",
+          "status": "Killed",
+          "description": "Replace FnValue by String::new()",
+          "statusReason": "thread 'test_origin_unicode_serialization' panicked at url/tests/unit.rs:599:9:\nassertion `left == right` failed\n  left: \"\"\n right: \"http://😅.com\"\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n",
+          "killedBy": [
+            "test_origin_unicode_serialization"
+          ]
+        },
+        {
+          "id": "url/src/origin.rs:64:9:65:77:FnValue:Default::default()",
+          "duration": 0.914296909,
+          "mutatorName": "FnValue",
+          "location": {
+            "start": {
+              "line": 64,
+              "column": 9
+            },
+            "end": {
+              "line": 65,
+              "column": 77
+            }
+          },
+          "replacement": "Default::default()",
+          "status": "CompileError",
+          "description": "Replace FnValue by Default::default()",
+          "killedBy": []
+        }
+      ],
+      "source": "// Copyright 2016 The rust-url developers.\n//\n// Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or\n// http://www.apache.org/licenses/LICENSE-2.0> or the MIT license\n// <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your\n// option. This file may not be copied, modified, or distributed\n// except according to those terms.\n\nuse crate::host::Host;\nuse crate::parser::default_port;\nuse crate::Url;\nuse std::sync::atomic::{AtomicUsize, Ordering};\n\npub fn url_origin(url: &Url) -> Origin {\n    let scheme = url.scheme();\n    match scheme {\n        \"blob\" => {\n            let result = Url::parse(url.path());\n            match result {\n                Ok(ref url) => url_origin(url),\n                Err(_) => Origin::new_opaque(),\n            }\n        }\n        \"ftp\" | \"http\" | \"https\" | \"ws\" | \"wss\" => Origin::Tuple(\n            scheme.to_owned(),\n            url.host().unwrap().to_owned(),\n            url.port_or_known_default().unwrap(),\n        ),\n        // TODO: Figure out what to do if the scheme is a file\n        \"file\" => Origin::new_opaque(),\n        _ => Origin::new_opaque(),\n    }\n}\n\n/// The origin of an URL\n///\n/// Two URLs with the same origin are considered\n/// to originate from the same entity and can therefore trust\n/// each other.\n///\n/// The origin is determined based on the scheme as follows:\n///\n/// - If the scheme is \"blob\" the origin is the origin of the\n///   URL contained in the path component. If parsing fails,\n///   it is an opaque origin.\n/// - If the scheme is \"ftp\", \"http\", \"https\", \"ws\", or \"wss\",\n///   then the origin is a tuple of the scheme, host, and port.\n/// - If the scheme is anything else, the origin is opaque, meaning\n///   the URL does not have the same origin as any other URL.\n///\n/// For more information see <https://url.spec.whatwg.org/#origin>\n#[derive(PartialEq, Eq, Hash, Clone, Debug)]\npub enum Origin {\n    /// A globally unique identifier\n    Opaque(OpaqueOrigin),\n\n    /// Consists of the URL's scheme, host and port\n    Tuple(String, Host<String>, u16),\n}\n\nimpl Origin {\n    /// Creates a new opaque origin that is only equal to itself.\n    pub fn new_opaque() -> Origin {\n        static COUNTER: AtomicUsize = AtomicUsize::new(0);\n        Origin::Opaque(OpaqueOrigin(COUNTER.fetch_add(1, Ordering::SeqCst)))\n    }\n\n    /// Return whether this origin is a (scheme, host, port) tuple\n    /// (as opposed to an opaque origin).\n    pub fn is_tuple(&self) -> bool {\n        matches!(*self, Origin::Tuple(..))\n    }\n\n    /// <https://html.spec.whatwg.org/multipage/#ascii-serialisation-of-an-origin>\n    pub fn ascii_serialization(&self) -> String {\n        match *self {\n            Origin::Opaque(_) => \"null\".to_owned(),\n            Origin::Tuple(ref scheme, ref host, port) => {\n                if default_port(scheme) == Some(port) {\n                    format!(\"{}://{}\", scheme, host)\n                } else {\n                    format!(\"{}://{}:{}\", scheme, host, port)\n                }\n            }\n        }\n    }\n\n    /// <https://html.spec.whatwg.org/multipage/#unicode-serialisation-of-an-origin>\n    pub fn unicode_serialization(&self) -> String {\n        match *self {\n            Origin::Opaque(_) => \"null\".to_owned(),\n            Origin::Tuple(ref scheme, ref host, port) => {\n                let host = match *host {\n                    Host::Domain(ref domain) => {\n                        let (domain, _errors) = idna::domain_to_unicode(domain);\n                        Host::Domain(domain)\n                    }\n                    _ => host.clone(),\n                };\n                if default_port(scheme) == Some(port) {\n                    format!(\"{}://{}\", scheme, host)\n                } else {\n                    format!(\"{}://{}:{}\", scheme, host, port)\n                }\n            }\n        }\n    }\n}\n\n/// Opaque identifier for URLs that have file or other schemes\n#[derive(Eq, PartialEq, Hash, Clone, Debug)]\npub struct OpaqueOrigin(usize);\n"
+    }
+  },
+  "thresholds": {
+    "low": 10,
+    "high": 50
+  },
+  "framework": {
+    "name": "cargo-mutants"
+  },
+  "projectRoot": "/home/max/dev/rust-url",
+  "testFiles": {
+    "slicing": {
+      "tests": [
+        {
+          "id": "slicing::test_count_digits",
+          "name": "slicing::test_count_digits"
+        }
+      ]
+    },
+    "- unknown module -": {
+      "tests": [
+        {
+          "id": "append_empty_segment_then_mutate",
+          "name": "append_empty_segment_then_mutate"
+        },
+        {
+          "id": "append_trailing_slash",
+          "name": "append_trailing_slash"
+        },
+        {
+          "id": "extend_query_pairs_then_mutate",
+          "name": "extend_query_pairs_then_mutate"
+        },
+        {
+          "id": "form_urlencoded_encoding_override",
+          "name": "form_urlencoded_encoding_override"
+        },
+        {
+          "id": "from_str",
+          "name": "from_str"
+        },
+        {
+          "id": "host",
+          "name": "host"
+        },
+        {
+          "id": "host_serialization",
+          "name": "host_serialization"
+        },
+        {
+          "id": "issue_124",
+          "name": "issue_124"
+        },
+        {
+          "id": "issue_197",
+          "name": "issue_197"
+        },
+        {
+          "id": "issue_241",
+          "name": "issue_241"
+        },
+        {
+          "id": "issue_61",
+          "name": "issue_61"
+        },
+        {
+          "id": "issue_864",
+          "name": "issue_864"
+        },
+        {
+          "id": "new_directory_paths",
+          "name": "new_directory_paths"
+        },
+        {
+          "id": "new_file_paths",
+          "name": "new_file_paths"
+        },
+        {
+          "id": "new_path_bad_utf8",
+          "name": "new_path_bad_utf8"
+        },
+        {
+          "id": "new_path_windows_fun",
+          "name": "new_path_windows_fun"
+        },
+        {
+          "id": "no_panic",
+          "name": "no_panic"
+        },
+        {
+          "id": "parse_with_params",
+          "name": "parse_with_params"
+        },
+        {
+          "id": "path_backslash_fun",
+          "name": "path_backslash_fun"
+        },
+        {
+          "id": "pop_if_empty_in_bounds",
+          "name": "pop_if_empty_in_bounds"
+        },
+        {
+          "id": "size",
+          "name": "size"
+        },
+        {
+          "id": "test_authority",
+          "name": "test_authority"
+        },
+        {
+          "id": "test_domain",
+          "name": "test_domain"
+        },
+        {
+          "id": "test_domain_encoding_quirks",
+          "name": "test_domain_encoding_quirks"
+        },
+        {
+          "id": "test_equality",
+          "name": "test_equality"
+        },
+        {
+          "id": "test_file_with_drive",
+          "name": "test_file_with_drive"
+        },
+        {
+          "id": "test_file_with_drive_and_path",
+          "name": "test_file_with_drive_and_path"
+        },
+        {
+          "id": "test_form_serialize",
+          "name": "test_form_serialize"
+        },
+        {
+          "id": "test_form_urlencoded",
+          "name": "test_form_urlencoded"
+        },
+        {
+          "id": "test_fragment",
+          "name": "test_fragment"
+        },
+        {
+          "id": "test_has_authority",
+          "name": "test_has_authority"
+        },
+        {
+          "id": "test_idna",
+          "name": "test_idna"
+        },
+        {
+          "id": "test_leading_dots",
+          "name": "test_leading_dots"
+        },
+        {
+          "id": "test_make_relative",
+          "name": "test_make_relative"
+        },
+        {
+          "id": "test_no_base_url",
+          "name": "test_no_base_url"
+        },
+        {
+          "id": "test_non_special_path",
+          "name": "test_non_special_path"
+        },
+        {
+          "id": "test_non_special_path2",
+          "name": "test_non_special_path2"
+        },
+        {
+          "id": "test_non_special_path3",
+          "name": "test_non_special_path3"
+        },
+        {
+          "id": "test_null_host_with_leading_empty_path_segment",
+          "name": "test_null_host_with_leading_empty_path_segment"
+        },
+        {
+          "id": "test_options_reuse",
+          "name": "test_options_reuse"
+        },
+        {
+          "id": "test_origin_blob_equality",
+          "name": "test_origin_blob_equality"
+        },
+        {
+          "id": "test_origin_hash",
+          "name": "test_origin_hash"
+        },
+        {
+          "id": "test_origin_opaque",
+          "name": "test_origin_opaque"
+        },
+        {
+          "id": "test_origin_unicode_serialization",
+          "name": "test_origin_unicode_serialization"
+        },
+        {
+          "id": "test_query",
+          "name": "test_query"
+        },
+        {
+          "id": "test_relative",
+          "name": "test_relative"
+        },
+        {
+          "id": "test_relative_empty",
+          "name": "test_relative_empty"
+        },
+        {
+          "id": "test_serialization",
+          "name": "test_serialization"
+        },
+        {
+          "id": "test_set_empty_host",
+          "name": "test_set_empty_host"
+        },
+        {
+          "id": "test_set_empty_hostname",
+          "name": "test_set_empty_hostname"
+        },
+        {
+          "id": "test_set_empty_password",
+          "name": "test_set_empty_password"
+        },
+        {
+          "id": "test_set_empty_query",
+          "name": "test_set_empty_query"
+        },
+        {
+          "id": "test_set_empty_username_and_password",
+          "name": "test_set_empty_username_and_password"
+        },
+        {
+          "id": "test_set_host",
+          "name": "test_set_host"
+        },
+        {
+          "id": "test_set_href",
+          "name": "test_set_href"
+        },
+        {
+          "id": "test_set_ip_host",
+          "name": "test_set_ip_host"
+        },
+        {
+          "id": "test_set_scheme_to_file_with_host",
+          "name": "test_set_scheme_to_file_with_host"
+        },
+        {
+          "id": "test_slicing",
+          "name": "test_slicing"
+        },
+        {
+          "id": "test_socket_addrs",
+          "name": "test_socket_addrs"
+        },
+        {
+          "id": "test_strip_trailing_spaces_from_opaque_path",
+          "name": "test_strip_trailing_spaces_from_opaque_path"
+        },
+        {
+          "id": "test_syntax_violation_callback",
+          "name": "test_syntax_violation_callback"
+        },
+        {
+          "id": "test_syntax_violation_callback_lifetimes",
+          "name": "test_syntax_violation_callback_lifetimes"
+        },
+        {
+          "id": "test_syntax_violation_callback_types",
+          "name": "test_syntax_violation_callback_types"
+        },
+        {
+          "id": "test_url_from_file_path",
+          "name": "test_url_from_file_path"
+        },
+        {
+          "id": "test_windows_unc_path",
+          "name": "test_windows_unc_path"
+        }
+      ]
+    },
+    "url/src/lib.rs": {
+      "tests": [
+        {
+          "id": "url/src/lib.rs - (line 18)",
+          "name": "url/src/lib.rs - (line 18)"
+        },
+        {
+          "id": "url/src/lib.rs - (line 26)",
+          "name": "url/src/lib.rs - (line 26)"
+        },
+        {
+          "id": "url/src/lib.rs - (line 57)",
+          "name": "url/src/lib.rs - (line 57)"
+        },
+        {
+          "id": "url/src/lib.rs - (line 89)",
+          "name": "url/src/lib.rs - (line 89)"
+        },
+        {
+          "id": "url/src/lib.rs - (line 97)",
+          "name": "url/src/lib.rs - (line 97)"
+        },
+        {
+          "id": "url/src/lib.rs - ParseOptions<'a>::syntax_violation_callback (line 237)",
+          "name": "url/src/lib.rs - ParseOptions<'a>::syntax_violation_callback (line 237)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::as_str (line 570)",
+          "name": "url/src/lib.rs - Url::as_str (line 570)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::authority (line 904)",
+          "name": "url/src/lib.rs - Url::authority (line 904)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::cannot_be_a_base (line 940)",
+          "name": "url/src/lib.rs - Url::cannot_be_a_base (line 940)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::domain (line 1143)",
+          "name": "url/src/lib.rs - Url::domain (line 1143)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::fragment (line 1441)",
+          "name": "url/src/lib.rs - Url::fragment (line 1441)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::from_file_path (line 2426)",
+          "name": "url/src/lib.rs - Url::from_file_path (line 2426)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::has_authority (line 868)",
+          "name": "url/src/lib.rs - Url::has_authority (line 868)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::has_host (line 1035)",
+          "name": "url/src/lib.rs - Url::has_host (line 1035)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::host (line 1108)",
+          "name": "url/src/lib.rs - Url::host (line 1108)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::host_str (line 1069)",
+          "name": "url/src/lib.rs - Url::host_str (line 1069)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::into_string (line 593)",
+          "name": "url/src/lib.rs - Url::into_string (line 593)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::is_special (line 841)",
+          "name": "url/src/lib.rs - Url::is_special (line 841)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::join (line 376)",
+          "name": "url/src/lib.rs - Url::join (line 376)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::make_relative (line 411)",
+          "name": "url/src/lib.rs - Url::make_relative (line 411)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::options (line 543)",
+          "name": "url/src/lib.rs - Url::options (line 543)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::origin (line 750)",
+          "name": "url/src/lib.rs - Url::origin (line 750)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::origin (line 767)",
+          "name": "url/src/lib.rs - Url::origin (line 767)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::origin (line 784)",
+          "name": "url/src/lib.rs - Url::origin (line 784)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::origin (line 801)",
+          "name": "url/src/lib.rs - Url::origin (line 801)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::parse (line 276)",
+          "name": "url/src/lib.rs - Url::parse (line 276)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::parse_with_params (line 304)",
+          "name": "url/src/lib.rs - Url::parse_with_params (line 304)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::password (line 997)",
+          "name": "url/src/lib.rs - Url::password (line 997)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::path (line 1290)",
+          "name": "url/src/lib.rs - Url::path (line 1290)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::path_segments (line 1326)",
+          "name": "url/src/lib.rs - Url::path_segments (line 1326)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::port (line 1174)",
+          "name": "url/src/lib.rs - Url::port (line 1174)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::port_or_known_default (line 1206)",
+          "name": "url/src/lib.rs - Url::port_or_known_default (line 1206)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::query (line 1362)",
+          "name": "url/src/lib.rs - Url::query (line 1362)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::query_pairs (line 1401)",
+          "name": "url/src/lib.rs - Url::query_pairs (line 1401)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::query_pairs_mut (line 1586)",
+          "name": "url/src/lib.rs - Url::query_pairs_mut (line 1586)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::scheme (line 821)",
+          "name": "url/src/lib.rs - Url::scheme (line 821)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::set_fragment (line 1475)",
+          "name": "url/src/lib.rs - Url::set_fragment (line 1475)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::set_host (line 1852)",
+          "name": "url/src/lib.rs - Url::set_host (line 1852)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::set_host (line 1868)",
+          "name": "url/src/lib.rs - Url::set_host (line 1868)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::set_host (line 1884)",
+          "name": "url/src/lib.rs - Url::set_host (line 1884)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::set_host (line 1900)",
+          "name": "url/src/lib.rs - Url::set_host (line 1900)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::set_ip_host (line 2040)",
+          "name": "url/src/lib.rs - Url::set_ip_host (line 2040)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::set_ip_host (line 2055)",
+          "name": "url/src/lib.rs - Url::set_ip_host (line 2055)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::set_password (line 2089)",
+          "name": "url/src/lib.rs - Url::set_password (line 2089)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::set_path (line 1648)",
+          "name": "url/src/lib.rs - Url::set_path (line 1648)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::set_port (line 1740)",
+          "name": "url/src/lib.rs - Url::set_port (line 1740)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::set_port (line 1759)",
+          "name": "url/src/lib.rs - Url::set_port (line 1759)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::set_port (line 1775)",
+          "name": "url/src/lib.rs - Url::set_port (line 1775)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::set_query (line 1534)",
+          "name": "url/src/lib.rs - Url::set_query (line 1534)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::set_scheme (line 2275)",
+          "name": "url/src/lib.rs - Url::set_scheme (line 2275)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::set_scheme (line 2290)",
+          "name": "url/src/lib.rs - Url::set_scheme (line 2290)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::set_scheme (line 2306)",
+          "name": "url/src/lib.rs - Url::set_scheme (line 2306)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::set_scheme (line 2322)",
+          "name": "url/src/lib.rs - Url::set_scheme (line 2322)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::set_scheme (line 2337)",
+          "name": "url/src/lib.rs - Url::set_scheme (line 2337)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::set_scheme (line 2352)",
+          "name": "url/src/lib.rs - Url::set_scheme (line 2352)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::set_username (line 2175)",
+          "name": "url/src/lib.rs - Url::set_username (line 2175)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::set_username (line 2190)",
+          "name": "url/src/lib.rs - Url::set_username (line 2190)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::socket_addrs (line 1239)",
+          "name": "url/src/lib.rs - Url::socket_addrs (line 1239)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::socket_addrs (line 1246)",
+          "name": "url/src/lib.rs - Url::socket_addrs (line 1246)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::to_file_path (line 2586)",
+          "name": "url/src/lib.rs - Url::to_file_path (line 2586)"
+        },
+        {
+          "id": "url/src/lib.rs - Url::username (line 967)",
+          "name": "url/src/lib.rs - Url::username (line 967)"
+        }
+      ]
+    },
+    "url/src/path_segments.rs": {
+      "tests": [
+        {
+          "id": "url/src/path_segments.rs - path_segments::PathSegmentsMut (line 20)",
+          "name": "url/src/path_segments.rs - path_segments::PathSegmentsMut (line 20)"
+        },
+        {
+          "id": "url/src/path_segments.rs - path_segments::PathSegmentsMut<'a>::clear (line 79)",
+          "name": "url/src/path_segments.rs - path_segments::PathSegmentsMut<'a>::clear (line 79)"
+        },
+        {
+          "id": "url/src/path_segments.rs - path_segments::PathSegmentsMut<'a>::extend (line 182)",
+          "name": "url/src/path_segments.rs - path_segments::PathSegmentsMut<'a>::extend (line 182)"
+        },
+        {
+          "id": "url/src/path_segments.rs - path_segments::PathSegmentsMut<'a>::extend (line 202)",
+          "name": "url/src/path_segments.rs - path_segments::PathSegmentsMut<'a>::extend (line 202)"
+        },
+        {
+          "id": "url/src/path_segments.rs - path_segments::PathSegmentsMut<'a>::pop_if_empty (line 107)",
+          "name": "url/src/path_segments.rs - path_segments::PathSegmentsMut<'a>::pop_if_empty (line 107)"
+        }
+      ]
+    },
+    "url/src/slicing.rs": {
+      "tests": [
+        {
+          "id": "url/src/slicing.rs - slicing::Position (line 67)",
+          "name": "url/src/slicing.rs - slicing::Position (line 67)"
+        }
+      ]
+    }
+  },
+  "performance": {
+    "initialRun": 6.012960743,
+    "mutation": 0,
+    "setup": 0
+  }
+}

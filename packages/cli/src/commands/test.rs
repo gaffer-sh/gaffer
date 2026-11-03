@@ -115,6 +115,23 @@ pub fn run(config: &Config, command: &[String], explicit_reports: &[String], for
                     }
                 }
             }
+            Some(parsers::ResultType::Mutation) => {
+                // Mutation reports are not recorded locally; `gaffer upload` sends the
+                // file unchanged and the dashboard parses it.
+                eprintln!(
+                    "[gaffer] {} is a mutation report. It is not processed by `gaffer test`; \
+                     upload it with `gaffer upload` and the dashboard parses it.",
+                    path.display()
+                );
+            }
+            Some(parsers::ResultType::Findings) => {
+                // SARIF findings are handled like mutation reports: uploaded unchanged.
+                eprintln!(
+                    "[gaffer] {} is a SARIF findings report. It is not processed by `gaffer test`; \
+                     upload it with `gaffer upload` and the dashboard parses it.",
+                    path.display()
+                );
+            }
             None => {
                 debug_timing!("[gaffer] Skipping unrecognized file: {}", path.display());
             }

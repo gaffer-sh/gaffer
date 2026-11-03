@@ -42,6 +42,10 @@ pub struct TestEvent {
     pub duration: f64,
     /// File path relative to project root
     pub file_path: Option<String>,
+    /// The group the format files the test under (JUnit `classname`, module path)
+    pub suite: Option<String>,
+    /// Line number in the source file
+    pub line: Option<u64>,
     /// Error message including stack trace (if failed)
     pub error: Option<String>,
     /// Number of retries attempted by the framework's retry mechanism
@@ -126,10 +130,15 @@ pub struct SlowestTest {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HealthScore {
-    pub score: f64,
+    /// `None` (label `"no-data"`) when the run carried no tests: health is undefined, not zero.
+    pub score: Option<f64>,
     pub label: String,
     pub trend: String,
     pub previous_score: Option<f64>,
+    /// Finished runs in the last 7 days that delivered no test data. A delivery outcome,
+    /// kept out of the score so a misconfigured job cannot zero it.
+    #[serde(default)]
+    pub zero_test_runs_7d: u32,
 }
 
 // =============================================================================

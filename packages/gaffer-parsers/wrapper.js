@@ -11,6 +11,8 @@ import {
   __wbindgen_cast_0000000000000001,
   detect_format as _detect_format,
   parse_coverage as _parse_coverage,
+  parse_findings as _parse_findings,
+  parse_mutation as _parse_mutation,
   parse_report as _parse_report,
 } from './pkg/gaffer_parsers_bg.js'
 import wasmModule from './pkg/gaffer_parsers_bg.wasm?module'
@@ -31,4 +33,12 @@ export function parse_report(content, filename) {
 
 export function parse_coverage(content, filename) {
   return _parse_coverage(content, filename)
+}
+
+export function parse_mutation(content, filename) {
+  return _parse_mutation(content, filename)
+}
+
+export function parse_findings(content, filename) {
+  return _parse_findings(content, filename)
 }

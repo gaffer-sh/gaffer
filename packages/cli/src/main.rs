@@ -330,8 +330,8 @@ enum Commands {
         #[arg(long)]
         data_dir: Option<PathBuf>,
 
-        /// Human-readable output (default: JSON)
-        #[arg(long)]
+        /// Human-readable output (default: JSON). Accepted before or after the subcommand.
+        #[arg(long, global = true)]
         pretty: bool,
 
         #[command(subcommand)]

@@ -61,12 +61,15 @@ pub fn print_health(health: &HealthScore, intelligence: Option<&TestIntelligence
         _ => health.label.to_string().red(),
     };
 
-    let mut line = format!(
-        "Health: {} ({}) {}",
-        health.score,
-        label_colored,
-        trend_arrow(&health.trend),
-    );
+    let mut line = match health.score {
+        Some(score) => format!(
+            "Health: {} ({}) {}",
+            score,
+            label_colored,
+            trend_arrow(&health.trend),
+        ),
+        None => format!("Health: {}", "no data (run had no tests)".yellow()),
+    };
 
     if let Some(intel) = intelligence {
         line.push_str(&format!(
@@ -76,6 +79,18 @@ pub fn print_health(health: &HealthScore, intelligence: Option<&TestIntelligence
     }
 
     eprintln!("{}", line);
+
+    if health.zero_test_runs_7d > 0 {
+        let runs = if health.zero_test_runs_7d == 1 { "run" } else { "runs" };
+        eprintln!(
+            "{}",
+            format!(
+                "Delivery: {} {} in the last 7 days delivered no test data",
+                health.zero_test_runs_7d, runs
+            )
+            .yellow()
+        );
+    }
 }
 
 /// Print flaky test entries. Shared by `print_flaky` (capped at 5) and `print_flaky_list` (all).

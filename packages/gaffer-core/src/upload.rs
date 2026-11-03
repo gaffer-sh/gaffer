@@ -72,6 +72,117 @@ const MAX_RETRIES: usize = 3;
 /// Initial backoff. Each subsequent retry doubles.
 const RETRY_BASE_DELAY_MS: u64 = 1_000;
 
+/// Longest name or date tag we send. The server rejects a whole upload over one
+/// oversized tag, so these are truncated rather than passed through.
+const MAX_COMMIT_TAG_BYTES: usize = 256;
+/// Longest `commitMessage` tag we send. Mirrors the dashboard's tag schema.
+const MAX_COMMIT_MESSAGE_BYTES: usize = 4096;
+
+/// What the uploader's checkout knows about the commit being uploaded. Read
+/// from the checkout because the GitHub App has no `contents: read` (GAF-337).
+/// Deliberately has no email fields, and [`Self::from_git_log`] removes addresses
+/// from names and messages (trailers like `Signed-off-by` carry them): they must
+/// never leave the checkout.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct CommitMetadata {
+    pub author_name: String,
+    pub committer_name: String,
+    pub author_date: String,
+    pub committer_date: String,
+    pub message: String,
+}
+
+impl CommitMetadata {
+    /// Format string for `git log`, matching what [`Self::from_git_log`] parses.
+    pub const GIT_LOG_FORMAT: &'static str = "%an%n%cn%n%aI%n%cI%n%s%n%b";
+
+    /// Parse `git log -1 --format=<GIT_LOG_FORMAT>` output: four fixed lines,
+    /// then the message. `None` when the output is too short to be that.
+    pub fn from_git_log(output: &str) -> Option<Self> {
+        let mut parts = output.splitn(5, '\n');
+        let author_name = without_emails(parts.next()?);
+        let committer_name = without_emails(parts.next()?);
+        let author_date = parts.next()?.to_string();
+        let committer_date = parts.next()?.to_string();
+        let message = without_emails(parts.next()?.trim());
+        Some(Self {
+            author_name,
+            committer_name,
+            author_date,
+            committer_date,
+            message,
+        })
+    }
+
+    fn insert_tags(&self, obj: &mut serde_json::Map<String, serde_json::Value>) {
+        let fields = [
+            ("commitAuthorName", &self.author_name, MAX_COMMIT_TAG_BYTES),
+            (
+                "commitCommitterName",
+                &self.committer_name,
+                MAX_COMMIT_TAG_BYTES,
+            ),
+            ("commitAuthorDate", &self.author_date, MAX_COMMIT_TAG_BYTES),
+            (
+                "commitCommitterDate",
+                &self.committer_date,
+                MAX_COMMIT_TAG_BYTES,
+            ),
+            ("commitMessage", &self.message, MAX_COMMIT_MESSAGE_BYTES),
+        ];
+        for (key, value, max) in fields {
+            if !value.is_empty() {
+                obj.insert(
+                    key.into(),
+                    serde_json::Value::String(truncate_utf8(value, max).to_string()),
+                );
+            }
+        }
+    }
+}
+
+/// `text` with every word that looks like an email address removed.
+fn without_emails(text: &str) -> String {
+    text.split('\n')
+        .map(|line| {
+            line.split(' ')
+                .filter(|word| !looks_like_email(word))
+                .collect::<Vec<_>>()
+                .join(" ")
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// `local@domain.tld`, allowing wrapping punctuation. `react@18.3.1` and
+/// `@scope/pkg` are not addresses, so the tld must be letters and the local
+/// part non-empty.
+fn looks_like_email(word: &str) -> bool {
+    let word = word.trim_matches(|c: char| !c.is_alphanumeric());
+    let Some((local, domain)) = word.split_once('@') else {
+        return false;
+    };
+    let Some((host, tld)) = domain.rsplit_once('.') else {
+        return false;
+    };
+    !local.is_empty()
+        && !host.is_empty()
+        && tld.len() >= 2
+        && tld.chars().all(|c| c.is_ascii_alphabetic())
+}
+
+/// Longest prefix of `s` that fits in `max` bytes without splitting a character.
+fn truncate_utf8(s: &str, max: usize) -> &str {
+    if s.len() <= max {
+        return s;
+    }
+    let mut end = max;
+    while !s.is_char_boundary(end) {
+        end -= 1;
+    }
+    &s[..end]
+}
+
 /// Configuration for an upload run. Mirrors v1 GitHub Action input names so a
 /// future Action wrapper can pass them through 1:1.
 ///
@@ -83,6 +194,8 @@ pub struct UploadConfig {
     pub token: String,
     pub api_url: Option<String>,
     pub commit_sha: Option<String>,
+    /// Author, committer and message for `commit_sha`, when a checkout has it.
+    pub commit_metadata: Option<CommitMetadata>,
     pub branch: Option<String>,
     pub test_framework: Option<String>,
     pub test_suite: Option<String>,
@@ -105,6 +218,7 @@ impl std::fmt::Debug for UploadConfig {
             .field("token", &"<redacted>")
             .field("api_url", &self.api_url)
             .field("commit_sha", &self.commit_sha)
+            .field("commit_metadata", &self.commit_metadata)
             .field("branch", &self.branch)
             .field("test_framework", &self.test_framework)
             .field("test_suite", &self.test_suite)
@@ -134,6 +248,9 @@ impl UploadConfig {
         }
         if let Some(v) = &self.test_suite {
             obj.insert("testSuite".into(), serde_json::Value::String(v.clone()));
+        }
+        if let Some(commit) = &self.commit_metadata {
+            commit.insert_tags(&mut obj);
         }
         serde_json::Value::Object(obj)
     }
@@ -1410,6 +1527,7 @@ mod tests {
             token: "gfr_test".into(),
             api_url: Some("http://localhost".into()),
             commit_sha: None,
+            commit_metadata: None,
             branch: None,
             test_framework: None,
             test_suite: None,
@@ -1518,6 +1636,91 @@ mod tests {
         let v = c.tags();
         assert_eq!(v["commitSha"], "abc");
         assert!(v.get("branch").is_none());
+    }
+
+    fn commit() -> CommitMetadata {
+        CommitMetadata {
+            author_name: "Ada".into(),
+            committer_name: "Grace".into(),
+            author_date: "2026-11-02T10:00:00+00:00".into(),
+            committer_date: "2026-11-02T11:00:00+00:00".into(),
+            message: "fix: a thing\nthe body".into(),
+        }
+    }
+
+    #[test]
+    fn tags_carry_commit_metadata_and_no_email() {
+        let mut c = cfg();
+        c.commit_metadata = Some(commit());
+        let v = c.tags();
+        assert_eq!(v["commitAuthorName"], "Ada");
+        assert_eq!(v["commitCommitterName"], "Grace");
+        assert_eq!(v["commitAuthorDate"], "2026-11-02T10:00:00+00:00");
+        assert_eq!(v["commitCommitterDate"], "2026-11-02T11:00:00+00:00");
+        assert_eq!(v["commitMessage"], "fix: a thing\nthe body");
+        assert!(!v.to_string().to_lowercase().contains("email"));
+    }
+
+    #[test]
+    fn tags_omit_commit_fields_without_metadata() {
+        let v = cfg().tags();
+        assert!(v
+            .as_object()
+            .unwrap()
+            .keys()
+            .all(|k| !k.starts_with("commit")));
+    }
+
+    #[test]
+    fn tags_omit_empty_commit_fields() {
+        let mut c = cfg();
+        c.commit_metadata = Some(CommitMetadata {
+            author_name: "Ada".into(),
+            ..CommitMetadata::default()
+        });
+        let v = c.tags();
+        assert_eq!(v["commitAuthorName"], "Ada");
+        assert!(v.get("commitMessage").is_none());
+    }
+
+    #[test]
+    fn tags_truncate_oversized_commit_fields_on_a_char_boundary() {
+        let mut c = cfg();
+        c.commit_metadata = Some(CommitMetadata {
+            author_name: "é".repeat(200),
+            message: "é".repeat(4000),
+            ..CommitMetadata::default()
+        });
+        let v = c.tags();
+        assert_eq!(v["commitAuthorName"].as_str().unwrap().len(), 256);
+        assert_eq!(v["commitMessage"].as_str().unwrap().len(), 4096);
+    }
+
+    #[test]
+    fn from_git_log_reads_fixed_lines_then_message() {
+        let parsed = CommitMetadata::from_git_log(
+            "Ada\nGrace\n2026-11-02T10:00:00+00:00\n2026-11-02T11:00:00+00:00\nfix: a thing\nthe body\n\n",
+        );
+        assert_eq!(parsed, Some(commit()));
+    }
+
+    #[test]
+    fn from_git_log_removes_email_addresses() {
+        let parsed = CommitMetadata::from_git_log(
+            "ada@example.com\nGrace <grace@example.com>\nd1\nd2\nfix: a thing\nSee react@18.3.1 and @scope/pkg\n\nSigned-off-by: Ada <ada@example.com>\nCo-Authored-By: Bot <noreply@anthropic.com>\n",
+        )
+        .unwrap();
+        assert_eq!(parsed.author_name, "");
+        assert_eq!(parsed.committer_name, "Grace");
+        assert_eq!(
+            parsed.message,
+            "fix: a thing\nSee react@18.3.1 and @scope/pkg\n\nSigned-off-by: Ada\nCo-Authored-By: Bot"
+        );
+    }
+
+    #[test]
+    fn from_git_log_rejects_short_output() {
+        assert_eq!(CommitMetadata::from_git_log("Ada\nGrace"), None);
     }
 
     #[test]

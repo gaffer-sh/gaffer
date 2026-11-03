@@ -153,6 +153,16 @@ fn error_message_from_trace_first_line() {
 }
 
 #[test]
+fn full_trace_kept_as_error_stack() {
+    let report = parse_minimal();
+    let tc = &report.test_cases[1];
+    assert_eq!(
+        tc.error_stack.as_deref(),
+        Some("AssertionError: expected 200\n    at test_auth.py:15")
+    );
+}
+
+#[test]
 fn no_error_when_neither_message_nor_trace() {
     let report = parse_basic();
     let tc = &report.test_cases[0]; // passed, no error

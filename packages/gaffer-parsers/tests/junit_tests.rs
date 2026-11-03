@@ -398,6 +398,72 @@ fn test_suite_file_inherited_by_testcase() {
 }
 
 #[test]
+fn test_suite_carries_the_classname_separately_from_full_name() {
+    let report = parse_and_check(r#"<testsuite name="s">
+        <testcase classname="tests.test_bar.TestX" name="test_a" time="0.1"/>
+        <testcase name="test_b" time="0.1"/>
+    </testsuite>"#);
+
+    assert_eq!(report["testCases"][0]["suite"], "tests.test_bar.TestX");
+    assert_eq!(report["testCases"][0]["fullName"], "tests.test_bar.TestX > test_a");
+    assert_eq!(report["testCases"][0]["name"], "test_a");
+    // No classname: falls back to the enclosing suite, as full_name already does.
+    assert_eq!(report["testCases"][1]["suite"], "s");
+}
+
+/// The filePath JUnit derives for a testcase with this classname and no `file` attribute.
+fn derived_file_path(classname: &str) -> serde_json::Value {
+    let xml = format!(r#"<testsuite name="s"><testcase classname="{classname}" name="t" time="0.1"/></testsuite>"#);
+    parse_and_check(&xml)["testCases"][0]["filePath"].clone()
+}
+
+#[test]
+fn test_file_path_derived_from_python_classname() {
+    for (classname, expected) in [
+        ("tests.integration.foo.test_bar.TestX", "tests/integration/foo/test_bar.py"),
+        ("tests.integration.foo.test_bar", "tests/integration/foo/test_bar.py"),
+        ("tests.test_helpers.test_bar.TestX.TestNested", "tests/test_helpers/test_bar.py"),
+        ("app.orders.orders_test.TestX", "app/orders/orders_test.py"),
+        ("test_bar", "test_bar.py"),
+    ] {
+        assert_eq!(derived_file_path(classname), expected, "classname {classname}");
+    }
+}
+
+#[test]
+fn test_file_path_not_invented_for_non_python_classnames() {
+    for classname in [
+        "com.example.billing.InvoiceTest",
+        "tests/unit/math.spec.ts",
+        "gaffer-parsers::junit::test_x",
+        "pytest",
+        "tests..test_bar",
+    ] {
+        assert!(derived_file_path(classname).is_null(), "classname {classname}");
+    }
+}
+
+#[test]
+fn test_file_path_not_invented_from_suite_name_fallback() {
+    let report = parse_and_check(r#"<testsuite name="test_utils"><testcase name="t" time="0.1"/></testsuite>"#);
+
+    assert!(report["testCases"][0]["filePath"].is_null());
+    assert_eq!(report["testCases"][0]["suite"], "test_utils");
+    assert_eq!(report["testCases"][0]["fullName"], "test_utils > t");
+}
+
+#[test]
+fn test_file_attribute_wins_over_derived_file_path() {
+    let report = parse_and_check(r#"<testsuite name="s" file="suite.py">
+        <testcase classname="tests.test_bar.TestX" name="own" file="own.py" time="0.1"/>
+        <testcase classname="tests.test_bar.TestX" name="inherited" time="0.1"/>
+    </testsuite>"#);
+
+    assert_eq!(report["testCases"][0]["filePath"], "own.py");
+    assert_eq!(report["testCases"][1]["filePath"], "suite.py");
+}
+
+#[test]
 fn test_junit_has_no_wall_clock_start_times() {
     // JUnit XML carries no per-test start time. The field must stay absent
     // rather than being filled with a plausible-looking substitute.
@@ -408,4 +474,81 @@ fn test_junit_has_no_wall_clock_start_times() {
         assert!(tc.get("startedAt").is_none());
         assert!(tc.get("workerIndex").is_none());
     }
+}
+
+fn find_test<'a>(report: &'a serde_json::Value, name: &str) -> &'a serde_json::Value {
+    report["testCases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|tc| tc["name"] == name)
+        .expect("Should find test")
+}
+
+#[test]
+fn test_failure_body_kept_as_stack_when_message_attribute_exists() {
+    let report = parse_and_check(&load_fixture("with-failures.xml"));
+    let failed = find_test(&report, "rejects invalid credentials");
+
+    assert_eq!(failed["errorMessage"], "Expected 401 but got 200");
+    let stack = failed["errorStack"].as_str().expect("failure body should be the stack");
+    assert!(stack.starts_with("AssertionError: Expected 401 but got 200"));
+    assert!(stack.contains("at Object.<anonymous> (tests/unit/auth.spec.ts:25:5)"));
+}
+
+#[test]
+fn test_error_body_kept_as_stack_when_message_attribute_exists() {
+    let report = parse_and_check(&load_fixture("with-failures.xml"));
+    let errored = find_test(&report, "handles timeout");
+
+    assert_eq!(errored["errorMessage"], "Connection timeout");
+    let stack = errored["errorStack"].as_str().expect("error body should be the stack");
+    assert!(stack.contains("at Timeout._onTimeout (tests/unit/auth.spec.ts:40:11)"));
+}
+
+#[test]
+fn test_cdata_failure_body_kept_as_stack() {
+    let xml = r#"<testsuite name="s"><testcase name="t"><failure message="boom"><![CDATA[Error: boom
+    at run (a.ts:1:1)]]></failure></testcase></testsuite>"#;
+    let report = parse_and_check(xml);
+    let failed = find_test(&report, "t");
+
+    assert_eq!(failed["errorMessage"], "boom");
+    assert_eq!(failed["errorStack"], "Error: boom\n    at run (a.ts:1:1)");
+}
+
+#[test]
+fn test_body_without_message_attribute_stays_the_message_only() {
+    let xml = r#"<testsuite name="s"><testcase name="t"><failure>only a body</failure></testcase></testsuite>"#;
+    let report = parse_and_check(xml);
+    let failed = find_test(&report, "t");
+
+    assert_eq!(failed["errorMessage"], "only a body");
+    assert!(failed.get("errorStack").is_none());
+}
+
+#[test]
+fn test_body_repeating_the_message_is_not_a_stack() {
+    let xml = r#"<testsuite name="s"><testcase name="t"><failure message="boom"> boom </failure></testcase></testsuite>"#;
+    let report = parse_and_check(xml);
+
+    assert!(find_test(&report, "t").get("errorStack").is_none());
+}
+
+#[test]
+fn test_self_closing_failure_has_no_stack() {
+    let xml = r#"<testsuite name="s"><testcase name="t"><failure message="boom"/></testcase></testsuite>"#;
+    let report = parse_and_check(xml);
+
+    assert!(find_test(&report, "t").get("errorStack").is_none());
+}
+
+#[test]
+fn test_error_stack_wins_with_error_status_when_both_elements_exist() {
+    let xml = r#"<testsuite name="s"><testcase name="t"><failure message="f">failure body</failure><error message="e">error body</error></testcase></testsuite>"#;
+    let report = parse_and_check(xml);
+    let failed = find_test(&report, "t");
+
+    assert_eq!(failed["errorMessage"], "e");
+    assert_eq!(failed["errorStack"], "error body");
 }

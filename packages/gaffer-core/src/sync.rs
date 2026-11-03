@@ -62,6 +62,13 @@ pub struct IngestSummary {
 #[serde(rename_all = "camelCase")]
 pub struct IngestTest {
     pub name: String,
+    /// Full suite-qualified name. Same value as `name` today, because
+    /// `TestEvent.name` already holds the parser's full name.
+    pub full_name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub suite: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub line: Option<u64>,
     pub status: String,
     pub duration_ms: f64,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -93,7 +100,10 @@ pub fn build_ingest_payload(
     let ingest_tests: Vec<IngestTest> = tests
         .into_iter()
         .map(|t| IngestTest {
+            full_name: t.name.clone(),
             name: t.name,
+            suite: t.suite,
+            line: t.line,
             status: t.status,
             duration_ms: t.duration,
             file_path: t.file_path,
@@ -283,6 +293,8 @@ mod tests {
                 error: None,
                 retry_count: None,
                 flaky: None,
+                suite: None,
+                line: None,
             },
         )
         .unwrap();
@@ -304,6 +316,39 @@ mod tests {
         assert_eq!(payload.tests.len(), 1);
         assert_eq!(payload.tests[0].name, "test_a");
         assert_eq!(payload.summary.total, 1);
+    }
+
+    #[test]
+    fn build_ingest_payload_sends_full_name_suite_and_line() {
+        let (db, _dir) = test_db();
+        let metadata = RunMetadata {
+            branch: None,
+            commit: None,
+            ci_provider: None,
+            framework: "junit".to_string(),
+        };
+        db.insert_run("run-1", &metadata, "2026-02-22T10:00:00Z").unwrap();
+        db.insert_test("run-1", &TestEvent {
+            name: "tests.test_bar.TestX > test_a".to_string(),
+            status: "passed".to_string(),
+            duration: 1.0,
+            file_path: None,
+            suite: Some("tests.test_bar.TestX".to_string()),
+            line: Some(7),
+            error: None,
+            retry_count: None,
+            flaky: None,
+        }).unwrap();
+        let summary = RunSummary { total: 1, passed: 1, failed: 0, skipped: 0, duration: 1.0 };
+        db.finish_run("run-1", &summary, "2026-02-22T10:00:01Z").unwrap();
+
+        let payload = build_ingest_payload(&db, "run-1", &summary).unwrap();
+
+        let json = serde_json::to_value(&payload).unwrap();
+        let test = &json["tests"][0];
+        assert_eq!(test["fullName"], "tests.test_bar.TestX > test_a");
+        assert_eq!(test["suite"], "tests.test_bar.TestX");
+        assert_eq!(test["line"], 7);
     }
 
     #[test]
@@ -357,6 +402,9 @@ mod tests {
                 error: None,
                 retry_count: None,
                 flaky: None,
+                full_name: "test_a".to_string(),
+                suite: None,
+                line: None,
             }],
             coverage: None,
         };
@@ -392,6 +440,8 @@ mod tests {
             error: None,
             retry_count: None,
             flaky: None,
+            suite: None,
+            line: None,
         }).unwrap();
 
         let summary = RunSummary { total: 1, passed: 1, failed: 0, skipped: 0, duration: 100.0 };

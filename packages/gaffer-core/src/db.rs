@@ -49,6 +49,7 @@ pub struct FailedTest {
 
 const MIGRATION_001: &str = include_str!("migrations/001_init.sql");
 const MIGRATION_002: &str = include_str!("migrations/002_coverage_columns.sql");
+const MIGRATION_003: &str = include_str!("migrations/003_test_identity.sql");
 
 /// Escape SQL LIKE wildcards (`%`, `_`, `\`) in user input so they are matched literally.
 fn escape_like(input: &str) -> String {
@@ -116,25 +117,33 @@ impl Database {
         };
 
         if version < 2 {
-            // Execute each ALTER individually — ignore "duplicate column" errors
-            // that occur when 001 already included the columns (fresh install).
-            for line in MIGRATION_002.lines() {
-                let line = line.trim();
-                if line.is_empty() || line.starts_with("--") {
-                    continue;
-                }
-                match self.conn.execute(line, []) {
-                    Ok(_) => {}
-                    Err(e) => {
-                        let msg = e.to_string();
-                        if !msg.contains("duplicate column name") {
-                            return Err(e);
-                        }
+            self.apply_additive_migration(MIGRATION_002)?;
+        }
+        if version < 3 {
+            self.apply_additive_migration(MIGRATION_003)?;
+        }
+
+        Ok(())
+    }
+
+    /// Execute each statement individually, ignoring "duplicate column" errors
+    /// that occur when 001 already included the columns (fresh install).
+    fn apply_additive_migration(&self, migration: &str) -> Result<(), rusqlite::Error> {
+        for line in migration.lines() {
+            let line = line.trim();
+            if line.is_empty() || line.starts_with("--") {
+                continue;
+            }
+            match self.conn.execute(line, []) {
+                Ok(_) => {}
+                Err(e) => {
+                    let msg = e.to_string();
+                    if !msg.contains("duplicate column name") {
+                        return Err(e);
                     }
                 }
             }
         }
-
         Ok(())
     }
 
@@ -164,8 +173,8 @@ impl Database {
     /// Optional fields (retry_count, flaky) default to 0/false when None.
     pub fn insert_test(&self, run_id: &str, test: &TestEvent) -> Result<(), rusqlite::Error> {
         self.conn.execute(
-            "INSERT INTO test_executions (run_id, name, status, duration_ms, file_path, error_message, retry_count, flaky)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            "INSERT INTO test_executions (run_id, name, status, duration_ms, file_path, error_message, retry_count, flaky, suite, line)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
             params![
                 run_id,
                 test.name,
@@ -175,6 +184,8 @@ impl Database {
                 test.error,
                 test.retry_count.unwrap_or(0),
                 test.flaky.unwrap_or(false),
+                test.suite,
+                test.line,
             ],
         )?;
         Ok(())
@@ -275,7 +286,7 @@ impl Database {
              WHERE tr.status = 'finished'
                AND tr.id IN (
                    SELECT id FROM test_runs
-                   WHERE status = 'finished'
+                   WHERE status = 'finished' AND COALESCE(total, 0) > 0
                    ORDER BY started_at DESC
                    LIMIT ?1
                )
@@ -329,7 +340,7 @@ impl Database {
         let result: Result<(i32, i32), _> = self.conn.query_row(
             "SELECT total, passed
              FROM test_runs
-             WHERE status = 'finished' AND id != ?1
+             WHERE status = 'finished' AND id != ?1 AND COALESCE(total, 0) > 0
              ORDER BY started_at DESC
              LIMIT 1",
             params![exclude_run_id],
@@ -404,7 +415,7 @@ impl Database {
         run_id: &str,
     ) -> Result<Vec<TestEvent>, rusqlite::Error> {
         let mut stmt = self.conn.prepare(
-            "SELECT name, status, duration_ms, file_path, error_message, retry_count, flaky
+            "SELECT name, status, duration_ms, file_path, error_message, retry_count, flaky, suite, line
              FROM test_executions WHERE run_id = ?1",
         )?;
 
@@ -417,6 +428,8 @@ impl Database {
                 error: row.get(4)?,
                 retry_count: row.get(5)?,
                 flaky: row.get(6)?,
+                suite: row.get(7)?,
+                line: row.get(8)?,
             })
         })?;
 
@@ -714,12 +727,13 @@ impl Database {
         rows.collect()
     }
 
-    /// Get the latest finished run's summary counts for health score computation.
-    /// Returns (run_id, total, passed) or None if no finished runs exist.
+    /// Get the latest finished run that carried tests, for health score computation.
+    /// Zero-test runs are skipped: they are a delivery outcome, not a test outcome.
+    /// Returns (run_id, total, passed) or None if no such run exists.
     pub fn get_latest_run_summary(&self) -> Result<Option<(String, i32, i32)>, rusqlite::Error> {
         let result = self.conn.query_row(
             "SELECT id, COALESCE(total, 0), COALESCE(passed, 0)
-             FROM test_runs WHERE status = 'finished'
+             FROM test_runs WHERE status = 'finished' AND COALESCE(total, 0) > 0
              ORDER BY started_at DESC LIMIT 1",
             [],
             |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
@@ -729,6 +743,16 @@ impl Database {
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
             Err(e) => Err(e),
         }
+    }
+
+    /// Count finished runs started at or after `since` (RFC 3339) that delivered no tests.
+    pub fn count_zero_test_runs_since(&self, since: &str) -> Result<u32, rusqlite::Error> {
+        self.conn.query_row(
+            "SELECT COUNT(*) FROM test_runs
+             WHERE status = 'finished' AND COALESCE(total, 0) = 0 AND started_at >= ?1",
+            params![since],
+            |row| row.get(0),
+        )
     }
 
     /// Get coverage data for a run. Returns None if no coverage exists.
@@ -807,6 +831,8 @@ mod tests {
             error: None,
             retry_count: None,
             flaky: None,
+            suite: None,
+            line: None,
         }
     }
 
@@ -870,6 +896,48 @@ mod tests {
         let db = Database::open(&db_path).unwrap();
         assert_eq!(db.get_run_count().unwrap(), 0);
         assert!(db_path.exists());
+    }
+
+    #[test]
+    fn suite_and_line_round_trip_through_the_database() {
+        let (db, _dir) = test_db();
+        db.insert_run("run-1", &sample_metadata(), "2026-02-22T10:00:00Z").unwrap();
+        let test = TestEvent {
+            suite: Some("tests.test_bar.TestX".to_string()),
+            line: Some(7),
+            ..sample_test("test_a", status::PASSED, 1.0)
+        };
+        db.insert_test("run-1", &test).unwrap();
+
+        let stored = db.get_test_executions_for_run("run-1").unwrap();
+
+        assert_eq!(stored[0].suite.as_deref(), Some("tests.test_bar.TestX"));
+        assert_eq!(stored[0].line, Some(7));
+    }
+
+    #[test]
+    fn migration_003_upgrades_a_version_2_database_and_keeps_its_rows() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("data.db");
+        {
+            let db = Database::open(&path).unwrap();
+            db.insert_run("run-1", &sample_metadata(), "2026-02-22T10:00:00Z").unwrap();
+            db.insert_test("run-1", &sample_test("old", status::PASSED, 1.0)).unwrap();
+            db.conn
+                .execute_batch(
+                    "ALTER TABLE test_executions DROP COLUMN suite;
+                     ALTER TABLE test_executions DROP COLUMN line;
+                     DELETE FROM schema_version WHERE version = 3;",
+                )
+                .unwrap();
+        }
+
+        let db = Database::open(&path).unwrap();
+
+        let stored = db.get_test_executions_for_run("run-1").unwrap();
+        assert_eq!(stored[0].name, "old");
+        assert_eq!(stored[0].suite, None);
+        assert_eq!(stored[0].line, None);
     }
 
     #[test]
@@ -1001,6 +1069,8 @@ mod tests {
             error: Some("Expected 200, got 401".to_string()),
             retry_count: Some(2),
             flaky: Some(true),
+            suite: None,
+            line: None,
         };
         db.insert_test("run-1", &test).unwrap();
 
@@ -1033,6 +1103,8 @@ mod tests {
             error: None,
             retry_count: None,
             flaky: None,
+            suite: None,
+            line: None,
         };
         db.insert_test("run-1", &test).unwrap();
 
@@ -1715,6 +1787,51 @@ mod tests {
         assert_eq!(id, "run-2");
         assert_eq!(total, 20);
         assert_eq!(passed, 19);
+    }
+
+    #[test]
+    fn get_latest_run_summary_skips_zero_test_runs() {
+        let (db, _dir) = test_db();
+        insert_finished_run(&db, "run-1", "2026-01-01T10:00:00Z", 20, 20, 0);
+        insert_finished_run(&db, "run-2", "2026-01-02T10:00:00Z", 0, 0, 0);
+
+        let (id, total, _) = db.get_latest_run_summary().unwrap().unwrap();
+        assert_eq!(id, "run-1");
+        assert_eq!(total, 20);
+    }
+
+    #[test]
+    fn get_previous_health_score_skips_zero_test_runs() {
+        let (db, _dir) = test_db();
+        insert_finished_run(&db, "run-1", "2026-01-01T10:00:00Z", 10, 10, 0);
+        insert_finished_run(&db, "run-2", "2026-01-02T10:00:00Z", 0, 0, 0);
+        insert_finished_run(&db, "run-3", "2026-01-03T10:00:00Z", 10, 10, 0);
+
+        assert!(db.get_previous_health_score("run-3").unwrap().is_some());
+    }
+
+    #[test]
+    fn historical_window_skips_zero_test_runs() {
+        let (db, _dir) = test_db();
+        insert_finished_run(&db, "run-1", "2026-01-01T10:00:00Z", 1, 1, 0);
+        db.insert_test("run-1", &sample_test("test_a", status::PASSED, 10.0))
+            .unwrap();
+        insert_finished_run(&db, "run-2", "2026-01-02T10:00:00Z", 0, 0, 0);
+
+        // A one-run window must land on the run with tests, not the empty one.
+        let history = db.get_historical_test_results(1).unwrap();
+        assert_eq!(history.len(), 1);
+        assert_eq!(history[0].run_id, "run-1");
+    }
+
+    #[test]
+    fn count_zero_test_runs_since_counts_only_recent_empty_runs() {
+        let (db, _dir) = test_db();
+        insert_finished_run(&db, "old-empty", "2026-01-01T10:00:00Z", 0, 0, 0);
+        insert_finished_run(&db, "new-empty", "2026-01-09T10:00:00Z", 0, 0, 0);
+        insert_finished_run(&db, "new-full", "2026-01-09T11:00:00Z", 5, 5, 0);
+
+        assert_eq!(db.count_zero_test_runs_since("2026-01-05T00:00:00+00:00").unwrap(), 1);
     }
 
     #[test]

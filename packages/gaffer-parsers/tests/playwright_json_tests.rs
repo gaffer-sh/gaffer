@@ -200,6 +200,43 @@ fn test_playwright_skipped_no_results_duration_null() {
     assert!(skipped["retryAttempt"].is_null());
 }
 
+/// The single-project fixture with `config.metadata` swapped for the given JSON.
+fn report_with_config_metadata(metadata: &str) -> serde_json::Value {
+    let json = load_fixture("playwright-json-single-project.json")
+        .replacen(r#""metadata": {}"#, &format!(r#""metadata": {metadata}"#), 1);
+    parse_via_registry(&json, "playwright-results.json")
+}
+
+#[test]
+fn test_playwright_keeps_git_commit_metadata() {
+    let report = report_with_config_metadata(r#"{
+        "gitCommit": {
+            "hash": "abc123",
+            "shortHash": "abc",
+            "branch": "main",
+            "subject": "fix: a thing",
+            "body": "fix: a thing\n\nlong body",
+            "author": { "name": "A Dev", "email": "dev@example.com", "time": 1 }
+        }
+    }"#);
+
+    assert_eq!(report["data"]["metadata"]["gitCommit"], serde_json::json!({
+        "hash": "abc123",
+        "branch": "main",
+        "subject": "fix: a thing",
+        "author": { "name": "A Dev", "email": "dev@example.com", "time": 1 }
+    }));
+}
+
+#[test]
+fn test_playwright_without_git_commit_omits_it_and_still_parses() {
+    for metadata in ["{}", r#"{ "gitCommit": {} }"#, r#"{ "gitCommit": "not-an-object" }"#] {
+        let report = report_with_config_metadata(metadata);
+        assert_eq!(report["type"], "testReport", "metadata {metadata}");
+        assert!(report["data"]["metadata"].get("gitCommit").is_none(), "metadata {metadata}");
+    }
+}
+
 #[test]
 fn test_playwright_metadata() {
     let json = load_fixture("playwright-json-report.json");
@@ -286,6 +323,21 @@ fn test_single_project_failed_with_error() {
     let error = failed["errorMessage"].as_str().unwrap();
     assert!(error.contains("Expected: \"2026\""));
     assert!(error.contains("Received: \"2025\""));
+}
+
+#[test]
+fn test_error_stack_kept_from_report() {
+    let json = load_fixture("playwright-json-report.json");
+    let report = parse_via_registry(&json, "playwright-results.json");
+
+    let test_cases = report["data"]["testCases"].as_array().unwrap();
+    let with_stack = test_cases
+        .iter()
+        .find(|tc| tc["errorStack"].is_string())
+        .expect("a failed test should carry its stack");
+    assert_eq!(with_stack["status"], "failed");
+    assert!(with_stack["errorStack"].as_str().unwrap().contains("at tests/login.spec.ts:25:30"));
+    assert!(test_cases.iter().filter(|tc| tc["status"] == "passed").all(|tc| tc.get("errorStack").is_none()));
 }
 
 #[test]

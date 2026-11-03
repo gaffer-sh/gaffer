@@ -22,6 +22,7 @@ fn cfg(api_url: &str) -> UploadConfig {
         token: "gfr_test".into(),
         api_url: Some(api_url.to_string()),
         commit_sha: Some("abc123".into()),
+        commit_metadata: None,
         branch: Some("main".into()),
         test_framework: Some("playwright".into()),
         test_suite: None,

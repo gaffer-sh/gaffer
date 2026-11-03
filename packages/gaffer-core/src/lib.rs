@@ -185,6 +185,20 @@ impl GafferCore {
                     filename, report.framework
                 )));
             }
+            ParseResult::Mutation(_) => {
+                return Err(GafferError::Parse(format!(
+                    "File '{}' is a mutation report, not a coverage format. \
+                     Check your report_patterns configuration.",
+                    filename
+                )));
+            }
+            ParseResult::Findings(_) => {
+                return Err(GafferError::Parse(format!(
+                    "File '{}' is a SARIF findings report, not a coverage format. \
+                     Check your report_patterns configuration.",
+                    filename
+                )));
+            }
         };
 
         let summary = convert_coverage_summary(&coverage_report);
@@ -211,13 +225,24 @@ impl GafferCore {
     // Query subcommands — on-demand queries for `gaffer query`
     // -----------------------------------------------------------------------
 
-    /// Compute health score from the latest finished run.
+    /// Compute health score from the latest finished run that carried tests.
+    ///
+    /// Zero-test runs never feed the score; they are counted in `zero_test_runs_7d`.
+    /// When every finished run is empty the result is the explicit `"no-data"` state.
     pub fn query_health(&self) -> Result<HealthScore, GafferError> {
         let db = self.lock_db()?;
+        let zero_test_runs_7d = db.count_zero_test_runs_since(&zero_test_window_start())?;
 
-        let (run_id, total, passed) = db
-            .get_latest_run_summary()?
-            .ok_or_else(|| GafferError::NotFound("No finished runs found. Run `gaffer test` first.".to_string()))?;
+        let Some((run_id, total, passed)) = db.get_latest_run_summary()? else {
+            if db.get_latest_finished_run_id()?.is_none() {
+                return Err(GafferError::NotFound(
+                    "No finished runs found. Run `gaffer test` first.".to_string(),
+                ));
+            }
+            let mut health = intel::health::calculate_health_score(0, 0, 0, None);
+            health.zero_test_runs_7d = zero_test_runs_7d;
+            return Ok(health);
+        };
 
         // Get flaky count from historical data
         let history = db.get_historical_test_results(20)?;
@@ -225,12 +250,10 @@ impl GafferCore {
 
         let previous_score = db.get_previous_health_score(&run_id)?;
 
-        Ok(intel::health::calculate_health_score(
-            total,
-            passed,
-            flaky_count,
-            previous_score,
-        ))
+        let mut health =
+            intel::health::calculate_health_score(total, passed, flaky_count, previous_score);
+        health.zero_test_runs_7d = zero_test_runs_7d;
+        Ok(health)
     }
 
     /// Detect flaky tests from historical runs.
@@ -574,12 +597,21 @@ impl GafferCore {
             }
         };
 
-        Some(intel::health::calculate_health_score(
+        let zero_test_runs_7d = db
+            .count_zero_test_runs_since(&zero_test_window_start())
+            .unwrap_or_else(|e| {
+                eprintln!("[gaffer] Warning: failed to count zero-test runs: {}", e);
+                0
+            });
+
+        let mut health = intel::health::calculate_health_score(
             summary.total,
             summary.passed,
             flaky_count,
             previous_score,
-        ))
+        );
+        health.zero_test_runs_7d = zero_test_runs_7d;
+        Some(health)
     }
 
     /// Compute coverage delta between two runs. Returns None if either run lacks coverage.
@@ -605,6 +637,11 @@ impl GafferCore {
                 - pct(baseline_cov.functions.covered, baseline_cov.functions.total),
         })
     }
+}
+
+/// Start of the window `zero_test_runs_7d` counts over, in the RFC 3339 form `started_at` uses.
+fn zero_test_window_start() -> String {
+    (chrono::Utc::now() - chrono::Duration::days(7)).to_rfc3339()
 }
 
 /// Convert gaffer-parsers CoverageReport → gaffer-core CoverageSummary.
@@ -692,6 +729,8 @@ mod tests {
                 error: None,
                 retry_count: None,
                 flaky: None,
+                suite: None,
+                line: None,
             },
         )
         .unwrap();
@@ -706,6 +745,8 @@ mod tests {
                 error: Some("assertion failed".to_string()),
                 retry_count: Some(1),
                 flaky: Some(false),
+                suite: None,
+                line: None,
             },
         )
         .unwrap();
@@ -768,6 +809,8 @@ mod tests {
                 error: None,
                 retry_count: None,
                 flaky: None,
+                suite: None,
+                line: None,
             },
         )
         .unwrap();
@@ -783,8 +826,40 @@ mod tests {
 
         assert!(report.health.is_some());
         let health = report.health.unwrap();
-        assert!(health.score > 0.0);
+        assert!(health.score.is_some_and(|s| s > 0.0));
         assert_eq!(health.trend, "stable");
+    }
+
+    #[test]
+    fn query_health_ignores_zero_test_runs_and_counts_them() {
+        let (core, _dir) = test_core();
+
+        let full = core.start_run(default_metadata()).unwrap();
+        let summary = RunSummary { total: 10, passed: 10, failed: 0, skipped: 0, duration: 100.0 };
+        core.end_run(&full, &summary).unwrap();
+
+        let empty = core.start_run(default_metadata()).unwrap();
+        let empty_summary = RunSummary { total: 0, passed: 0, failed: 0, skipped: 0, duration: 10.0 };
+        let report = core.end_run(&empty, &empty_summary).unwrap();
+        assert_eq!(report.health.as_ref().and_then(|h| h.score), None);
+
+        let health = core.query_health().unwrap();
+        assert_eq!(health.score, Some(95.0));
+        assert_eq!(health.zero_test_runs_7d, 1);
+    }
+
+    #[test]
+    fn query_health_returns_no_data_when_every_run_is_empty() {
+        let (core, _dir) = test_core();
+
+        let empty = core.start_run(default_metadata()).unwrap();
+        let empty_summary = RunSummary { total: 0, passed: 0, failed: 0, skipped: 0, duration: 10.0 };
+        core.end_run(&empty, &empty_summary).unwrap();
+
+        let health = core.query_health().unwrap();
+        assert_eq!(health.score, None);
+        assert_eq!(health.label, "no-data");
+        assert_eq!(health.zero_test_runs_7d, 1);
     }
 
     #[test]
@@ -810,6 +885,8 @@ mod tests {
                     error,
                     retry_count: None,
                     flaky: None,
+                    suite: None,
+                    line: None,
                 },
             )
             .unwrap();
@@ -824,6 +901,8 @@ mod tests {
                     error: None,
                     retry_count: None,
                     flaky: None,
+                    suite: None,
+                    line: None,
                 },
             )
             .unwrap();
@@ -864,6 +943,8 @@ mod tests {
                 error,
                 retry_count: None,
                 flaky: None,
+                suite: None,
+                line: None,
             },
         )
         .unwrap();
@@ -886,7 +967,7 @@ mod tests {
 
         let health = core.query_health().unwrap();
         // 1 passed, 0 failed, 0 flaky → near-perfect score
-        assert!(health.score >= 80.0, "Expected score >= 80 for all-passing run, got {}", health.score);
+        assert!(health.score.is_some_and(|s| s >= 80.0), "Expected score >= 80 for all-passing run, got {:?}", health.score);
         assert!(!health.label.is_empty());
     }
 
@@ -921,6 +1002,8 @@ mod tests {
                     error: None,
                     retry_count: None,
                     flaky: None,
+                    suite: None,
+                    line: None,
                 },
             )
             .unwrap();
@@ -1040,6 +1123,8 @@ mod tests {
                     error,
                     retry_count: None,
                     flaky: None,
+                    suite: None,
+                    line: None,
                 },
             )
             .unwrap();
@@ -1351,6 +1436,8 @@ mod tests {
             error: Some("timeout".to_string()),
             retry_count: Some(0),
             flaky: Some(false),
+            suite: None,
+            line: None,
         }).unwrap();
         // Retry: passed
         core.record_test(&run_id, &TestEvent {
@@ -1361,6 +1448,8 @@ mod tests {
             error: None,
             retry_count: Some(1),
             flaky: Some(true),
+            suite: None,
+            line: None,
         }).unwrap();
         let run_summary = RunSummary { total: 1, passed: 1, failed: 0, skipped: 0, duration: 150.0 };
         core.end_run(&run_id, &run_summary).unwrap();

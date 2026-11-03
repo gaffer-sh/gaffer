@@ -1,0 +1,76 @@
+{
+  "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "CodeQL",
+          "semanticVersion": "2.19.0",
+          "rules": [
+            {
+              "id": "js/unused-local-variable",
+              "name": "js/unused-local-variable",
+              "shortDescription": { "text": "Unused variable, import, function or class" },
+              "defaultConfiguration": { "level": "note" }
+            }
+          ]
+        },
+        "extensions": [
+          {
+            "name": "codeql/javascript-queries",
+            "version": "1.1.0",
+            "rules": [
+              {
+                "id": "js/sql-injection",
+                "shortDescription": { "text": "Database query built from user-controlled sources" },
+                "helpUri": "https://codeql.github.com/codeql-query-help/javascript/js-sql-injection/",
+                "defaultConfiguration": { "level": "error" }
+              }
+            ]
+          }
+        ]
+      },
+      "results": [
+        {
+          "ruleId": "js/unused-local-variable",
+          "ruleIndex": 0,
+          "message": { "text": "Unused variable {0}.", "arguments": ["tmp"] },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": { "uri": "src/app.js", "uriBaseId": "%SRCROOT%", "index": 0 },
+                "region": { "startLine": 12, "startColumn": 7, "endColumn": 10 }
+              }
+            }
+          ],
+          "partialFingerprints": { "primaryLocationLineHash": "39fa2ee980eb94b0:1", "primaryLocationLineHash/v1": "39fa2ee980eb94b0:1" }
+        },
+        {
+          "rule": { "index": 0, "toolComponent": { "index": 0 } },
+          "message": { "markdown": "Query built from [user input](1)." },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": { "uri": "./src/db.js" },
+                "region": { "startLine": 40, "startColumn": 3, "endLine": 40, "endColumn": 52 }
+              }
+            }
+          ],
+          "suppressions": [ { "kind": "external", "status": "rejected" } ]
+        },
+        {
+          "ruleId": "js/sql-injection",
+          "level": "warning",
+          "message": {},
+          "locations": [ { "logicalLocations": [ { "fullyQualifiedName": "db.query" } ] } ],
+          "suppressions": [ { "kind": "inSource" }, { "kind": "external", "status": "underReview" } ]
+        }
+      ]
+    },
+    {
+      "tool": { "driver": { "name": "Semgrep OSS", "version": "1.90.0", "informationUri": "https://semgrep.dev" } },
+      "results": null
+    }
+  ]
+}

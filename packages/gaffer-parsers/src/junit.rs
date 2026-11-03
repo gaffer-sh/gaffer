@@ -53,15 +53,19 @@ struct SuiteContext {
 /// Context accumulated while inside a `<testcase>` element.
 struct TestcaseContext {
     name: String,
+    /// The testcase's own `classname` attribute, never the suite-name fallback.
     classname: Option<String>,
+    suite_name: String,
     time: Option<f64>,
     file: Option<String>,
     line: Option<u64>,
     has_skipped: bool,
     has_error: bool,
     error_message: Option<String>,
+    error_stack: Option<String>,
     has_failure: bool,
     failure_message: Option<String>,
+    failure_stack: Option<String>,
     text_buf: String,
 }
 
@@ -72,30 +76,63 @@ enum InsideElement {
     Error,
 }
 
+/// Assign a `<failure>`/`<error>` body: it is the message when the element has
+/// no `message` attribute, otherwise the stack trace. A body that only repeats
+/// the attribute carries nothing new, so it is not a stack.
+fn assign_element_body(body: &str, message: &mut Option<String>, stack: &mut Option<String>) {
+    let body = body.trim();
+    if body.is_empty() {
+        return;
+    }
+    match message {
+        None => *message = Some(body.to_string()),
+        Some(existing) if existing != body => *stack = Some(body.to_string()),
+        Some(_) => {}
+    }
+}
+
+/// Derive a file path from a pytest-style dotted classname, which is the only
+/// locality pytest's JUnit output carries. Only a `test_*` or `*_test` module
+/// segment counts, pytest's default file patterns, so a Java
+/// `com.foo.BarTest` never turns into an invented `.py` path.
+fn file_path_from_python_classname(classname: &str) -> Option<String> {
+    let segments: Vec<&str> = classname.split('.').collect();
+    let is_identifier = |s: &str| !s.is_empty() && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '_');
+    if !segments.iter().all(|s| is_identifier(s)) {
+        return None;
+    }
+    let module = segments
+        .iter()
+        .rposition(|s| s.starts_with("test_") || s.ends_with("_test"))?;
+    Some(format!("{}.py", segments[..=module].join("/")))
+}
+
 fn finalize_testcase(ctx: TestcaseContext, id: usize, suite_file: Option<&str>) -> TestCase {
     let name = ctx.name;
-    let classname = ctx.classname;
+    let derived_file_path = ctx.classname.as_deref().and_then(file_path_from_python_classname);
+    let suite = ctx.classname.unwrap_or(ctx.suite_name);
 
-    let full_name = match &classname {
-        Some(cn) if cn != &name => format!("{} > {}", cn, name),
-        _ => name.clone(),
+    let full_name = if suite != name {
+        format!("{} > {}", suite, name)
+    } else {
+        name.clone()
     };
 
     // Status priority (matching JS): skipped > error > failure > passed
-    let (status, error_message) = if ctx.has_skipped {
-        (TestStatus::Skipped, None)
+    let (status, error_message, error_stack) = if ctx.has_skipped {
+        (TestStatus::Skipped, None, None)
     } else if ctx.has_error {
         let msg = ctx
             .error_message
             .unwrap_or_else(|| "Test error".to_string());
-        (TestStatus::Failed, Some(msg))
+        (TestStatus::Failed, Some(msg), ctx.error_stack)
     } else if ctx.has_failure {
         let msg = ctx
             .failure_message
             .unwrap_or_else(|| "Test failed".to_string());
-        (TestStatus::Failed, Some(msg))
+        (TestStatus::Failed, Some(msg), ctx.failure_stack)
     } else {
-        (TestStatus::Passed, None)
+        (TestStatus::Passed, None, None)
     };
 
     let duration_ms = {
@@ -108,15 +145,20 @@ fn finalize_testcase(ctx: TestcaseContext, id: usize, suite_file: Option<&str>) 
         }
     };
 
-    let file_path = ctx.file.or_else(|| suite_file.map(|s| s.to_string()));
+    let file_path = ctx
+        .file
+        .or_else(|| suite_file.map(|s| s.to_string()))
+        .or(derived_file_path);
 
     TestCase {
         id: format!("tc-{}", id),
         name,
         full_name,
+        suite: Some(suite),
         status,
         duration_ms,
         error_message,
+        error_stack,
         file_path,
         line: ctx.line,
         retry_attempt: None,
@@ -191,7 +233,8 @@ pub fn parse_junit(input: &str) -> Result<ParsedReport, String> {
                         current_testcase = Some(TestcaseContext {
                             name: get_attr(e, b"name")
                                 .unwrap_or_else(|| "Unknown Test".to_string()),
-                            classname: get_attr(e, b"classname").or(Some(suite_name)),
+                            classname: get_attr(e, b"classname"),
+                            suite_name,
                             time: get_attr(e, b"time")
                                 .and_then(|s| s.parse::<f64>().ok()),
                             file: get_attr(e, b"file"),
@@ -200,8 +243,10 @@ pub fn parse_junit(input: &str) -> Result<ParsedReport, String> {
                             has_skipped: false,
                             has_error: false,
                             error_message: None,
+                            error_stack: None,
                             has_failure: false,
                             failure_message: None,
+                            failure_stack: None,
                             text_buf: String::new(),
                         });
                     }
@@ -252,7 +297,8 @@ pub fn parse_junit(input: &str) -> Result<ParsedReport, String> {
                         let ctx = TestcaseContext {
                             name: get_attr(e, b"name")
                                 .unwrap_or_else(|| "Unknown Test".to_string()),
-                            classname: get_attr(e, b"classname").or(Some(suite_name)),
+                            classname: get_attr(e, b"classname"),
+                            suite_name,
                             time: get_attr(e, b"time")
                                 .and_then(|s| s.parse::<f64>().ok()),
                             file: get_attr(e, b"file"),
@@ -261,8 +307,10 @@ pub fn parse_junit(input: &str) -> Result<ParsedReport, String> {
                             has_skipped: false,
                             has_error: false,
                             error_message: None,
+                            error_stack: None,
                             has_failure: false,
                             failure_message: None,
+                            failure_stack: None,
                             text_buf: String::new(),
                         };
 
@@ -311,27 +359,24 @@ pub fn parse_junit(input: &str) -> Result<ParsedReport, String> {
                         inside_element = InsideElement::None;
                     }
                     b"failure"
-                        // If no @message was found, fall back to text content
                         if inside_element == InsideElement::Failure => {
                             if let Some(ref mut tc) = current_testcase {
-                                if tc.failure_message.is_none() {
-                                    let trimmed = tc.text_buf.trim().to_string();
-                                    if !trimmed.is_empty() {
-                                        tc.failure_message = Some(trimmed);
-                                    }
-                                }
+                                assign_element_body(
+                                    &tc.text_buf,
+                                    &mut tc.failure_message,
+                                    &mut tc.failure_stack,
+                                );
                             }
                             inside_element = InsideElement::None;
                         }
                     b"error"
                         if inside_element == InsideElement::Error => {
                             if let Some(ref mut tc) = current_testcase {
-                                if tc.error_message.is_none() {
-                                    let trimmed = tc.text_buf.trim().to_string();
-                                    if !trimmed.is_empty() {
-                                        tc.error_message = Some(trimmed);
-                                    }
-                                }
+                                assign_element_body(
+                                    &tc.text_buf,
+                                    &mut tc.error_message,
+                                    &mut tc.error_stack,
+                                );
                             }
                             inside_element = InsideElement::None;
                         }

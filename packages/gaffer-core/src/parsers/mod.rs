@@ -15,7 +15,7 @@ pub struct ParsedReport {
     pub duration_ms: Option<u64>,
 }
 
-/// Detect whether a file is a test report or coverage, using `ParserRegistry`.
+/// Detect whether a file is a test report, coverage, a mutation report or SARIF findings, using `ParserRegistry`.
 /// Returns `None` if no parser matched.
 pub fn detect_result_type(path: &Path, content: &str) -> Option<ResultType> {
     let filename = path.file_name().and_then(|f| f.to_str()).unwrap_or("");
@@ -35,6 +35,12 @@ pub fn parse_report(path: &Path, content: &str) -> Result<ParsedReport, String> 
         }
         Some(Ok(gaffer_parsers::ParseResult::Coverage(_))) => {
             Err("File is a coverage report, not a test report".to_string())
+        }
+        Some(Ok(gaffer_parsers::ParseResult::Mutation(_))) => {
+            Err("File is a mutation report, not a test report".to_string())
+        }
+        Some(Ok(gaffer_parsers::ParseResult::Findings(_))) => {
+            Err("File is a SARIF findings report, not a test report".to_string())
         }
         Some(Err(e)) => Err(e.message),
         None => Err(format!("Unknown report format for {}", path.display())),
@@ -67,6 +73,8 @@ fn convert_test_case(tc: gaffer_parsers::types::TestCase) -> TestEvent {
         status: test_status.to_string(),
         duration: tc.duration_ms.unwrap_or(0) as f64,
         file_path: tc.file_path,
+        suite: tc.suite,
+        line: tc.line,
         error: tc.error_message,
         retry_count: tc.retry_attempt.map(|r| r as i32),
         flaky,
@@ -109,6 +117,24 @@ mod tests {
         let content = r#"<?xml version="1.0"?><coverage line-rate="0.5" branch-rate="0.3"><packages><package name="p"><classes></classes></package></packages></coverage>"#;
         let result = detect_result_type(Path::new("cobertura.xml"), content);
         assert_eq!(result, Some(ResultType::Coverage));
+    }
+
+    #[test]
+    fn detect_and_reject_stryker_mutation_report() {
+        let content = r#"{"schemaVersion":"1","thresholds":{"high":80,"low":60},"files":{"a.js":{"language":"javascript","source":"","mutants":[]}}}"#;
+        let path = Path::new("mutation.json");
+        assert_eq!(detect_result_type(path, content), Some(ResultType::Mutation));
+        let err = parse_report(path, content).unwrap_err();
+        assert!(err.contains("mutation report"), "{err}");
+    }
+
+    #[test]
+    fn detect_and_reject_sarif_findings_report() {
+        let content = r#"{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"ruff"}},"results":[]}]}"#;
+        let path = Path::new("results.sarif");
+        assert_eq!(detect_result_type(path, content), Some(ResultType::Findings));
+        let err = parse_report(path, content).unwrap_err();
+        assert!(err.contains("SARIF findings report"), "{err}");
     }
 
     #[test]
@@ -283,15 +309,30 @@ mod tests {
     }
 
     #[test]
+    fn parse_report_keeps_junit_suite_and_line_on_the_event() {
+        let content = r#"<testsuite name="s"><testcase classname="tests.test_bar.TestX" name="test_a" line="7" time="0.1"/></testsuite>"#;
+
+        let result = parse_report(Path::new("junit.xml"), content).unwrap();
+
+        let event = &result.tests[0];
+        assert_eq!(event.name, "tests.test_bar.TestX > test_a");
+        assert_eq!(event.suite.as_deref(), Some("tests.test_bar.TestX"));
+        assert_eq!(event.line, Some(7));
+        assert_eq!(event.file_path.as_deref(), Some("tests/test_bar.py"));
+    }
+
+    #[test]
     fn convert_test_case_timed_out_maps_to_failed() {
         use gaffer_parsers::types::{TestCase, TestStatus};
         let tc = TestCase {
             id: "t1".to_string(),
             name: "slow test".to_string(),
             full_name: "slow test".to_string(),
+            suite: None,
             status: TestStatus::TimedOut,
             duration_ms: Some(30000),
             error_message: Some("Timeout exceeded".to_string()),
+            error_stack: None,
             file_path: None,
             line: None,
             retry_attempt: None,
@@ -310,9 +351,11 @@ mod tests {
             id: "t2".to_string(),
             name: "flaky test".to_string(),
             full_name: "flaky test".to_string(),
+            suite: None,
             status: TestStatus::Flaky,
             duration_ms: Some(500),
             error_message: None,
+            error_stack: None,
             file_path: None,
             line: None,
             retry_attempt: Some(1),

@@ -21,10 +21,11 @@ pub fn calculate_health_score(
 ) -> HealthScore {
     if total == 0 {
         return HealthScore {
-            score: 0.0,
-            label: "critical".to_string(),
+            score: None,
+            label: "no-data".to_string(),
             trend: "stable".to_string(),
             previous_score: None,
+            zero_test_runs_7d: 0,
         };
     }
 
@@ -51,10 +52,11 @@ pub fn calculate_health_score(
     let label = get_health_label(final_score);
 
     HealthScore {
-        score: final_score,
+        score: Some(final_score),
         label: label.to_string(),
         trend: trend.to_string(),
         previous_score,
+        zero_test_runs_7d: 0,
     }
 }
 
@@ -81,16 +83,16 @@ mod tests {
         let result = calculate_health_score(100, 100, 0, None);
         // pass_rate=100, flaky=0, trend=stable(50)
         // 100*0.6 + 100*0.3 + 50*0.1 = 60 + 30 + 5 = 95
-        assert_eq!(result.score, 95.0);
+        assert_eq!(result.score, Some(95.0));
         assert_eq!(result.label, "excellent");
         assert_eq!(result.trend, "stable");
     }
 
     #[test]
-    fn zero_total_returns_critical() {
+    fn zero_total_returns_no_data() {
         let result = calculate_health_score(0, 0, 0, None);
-        assert_eq!(result.score, 0.0);
-        assert_eq!(result.label, "critical");
+        assert_eq!(result.score, None);
+        assert_eq!(result.label, "no-data");
     }
 
     #[test]
@@ -98,7 +100,7 @@ mod tests {
         let result = calculate_health_score(100, 0, 0, None);
         // pass_rate=0, flaky=0, trend=stable(50)
         // 0*0.6 + 100*0.3 + 50*0.1 = 0 + 30 + 5 = 35
-        assert_eq!(result.score, 35.0);
+        assert_eq!(result.score, Some(35.0));
         assert_eq!(result.label, "poor");
     }
 
@@ -107,7 +109,7 @@ mod tests {
         let result = calculate_health_score(100, 90, 50, None);
         // pass_rate=90, flaky=50%
         // 90*0.6 + 50*0.3 + 50*0.1 = 54 + 15 + 5 = 74
-        assert_eq!(result.score, 74.0);
+        assert_eq!(result.score, Some(74.0));
         assert_eq!(result.label, "fair");
     }
 
@@ -117,7 +119,7 @@ mod tests {
         let result = calculate_health_score(100, 100, 0, Some(60.0));
         assert_eq!(result.trend, "improving");
         // With improving trend: 100*0.6 + 100*0.3 + 100*0.1 = 60 + 30 + 10 = 100
-        assert_eq!(result.score, 100.0);
+        assert_eq!(result.score, Some(100.0));
         assert_eq!(result.label, "excellent");
     }
 
@@ -127,7 +129,7 @@ mod tests {
         let result = calculate_health_score(100, 50, 0, Some(95.0));
         assert_eq!(result.trend, "declining");
         // With declining trend: 50*0.6 + 100*0.3 + 0*0.1 = 30 + 30 + 0 = 60
-        assert_eq!(result.score, 60.0);
+        assert_eq!(result.score, Some(60.0));
     }
 
     #[test]

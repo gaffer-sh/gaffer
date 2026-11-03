@@ -6,11 +6,11 @@
 //! only the clap surface, the structured-error renderer, and the tokio
 //! runtime entry point.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use gaffer_core::upload::{self, UploadConfig, UploadError, UploadOutcome};
 
-use crate::oidc;
+use crate::{git, oidc};
 
 /// CLI flag bag — kebab-case names mirror the v1 GitHub Action input names
 /// 1:1 so the v2 Action wrapper can pass them through without renaming.
@@ -43,10 +43,16 @@ pub fn run(args: UploadArgs) -> i32 {
         }
     };
 
+    let commit_metadata = args
+        .commit_sha
+        .as_deref()
+        .and_then(|sha| git::read_commit_metadata(sha, Path::new(".")));
+
     let config = UploadConfig {
         token,
         api_url,
         commit_sha: args.commit_sha,
+        commit_metadata,
         branch: args.branch,
         test_framework: args.test_framework,
         test_suite: args.test_suite,

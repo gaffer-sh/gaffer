@@ -4,7 +4,7 @@ use gaffer_parsers::{Parser, ParserRegistry, JUnitParser, LcovParser, ParseError
 fn test_registry_with_defaults_has_junit() {
     let registry = ParserRegistry::with_defaults();
     let ids = registry.parser_ids();
-    assert_eq!(ids, vec!["junit", "jest-vitest-json", "playwright-json", "ctrf", "lcov", "trx", "cobertura", "jacoco", "clover"]);
+    assert_eq!(ids, vec!["junit", "jest-vitest-json", "playwright-json", "ctrf", "lcov", "trx", "cobertura", "jacoco", "clover", "stryker", "sarif"]);
 }
 
 #[test]
@@ -210,7 +210,7 @@ fn test_registry_test_report_not_coverage() {
     let result = registry.parse(xml, "report.xml");
     match result.unwrap().unwrap() {
         ParseResult::TestReport(_) => {} // correct
-        ParseResult::Coverage(_) => panic!("JUnit should not produce Coverage result"),
+        other => panic!("JUnit should produce a TestReport, got {other:?}"),
     }
 }
 

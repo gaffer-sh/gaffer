@@ -6,6 +6,8 @@ use crate::jest_vitest_json::JestVitestParser;
 use crate::junit::JUnitParser;
 use crate::lcov::LcovParser;
 use crate::playwright_json::PlaywrightJsonParser;
+use crate::sarif::SarifParser;
+use crate::stryker::StrykerParser;
 use crate::trx::TrxParser;
 use crate::types::{DetectionMatch, ParseError, ParseResult, ResultType};
 
@@ -75,6 +77,10 @@ impl ParserRegistry {
             .expect("Built-in JaCoCo parser registration must succeed");
         registry.register(Box::new(CloverParser))
             .expect("Built-in Clover parser registration must succeed");
+        registry.register(Box::new(StrykerParser))
+            .expect("Built-in Stryker parser registration must succeed");
+        registry.register(Box::new(SarifParser))
+            .expect("Built-in SARIF parser registration must succeed");
         registry
     }
 
@@ -207,6 +213,24 @@ mod tests {
         assert_eq!(m.parser_id, "clover");
         assert!(m.score >= 50);
         assert_eq!(m.result_type, ResultType::Coverage);
+    }
+
+    #[test]
+    fn detect_stryker_json() {
+        let content = r#"{"schemaVersion":"1","thresholds":{"high":80,"low":60},"files":{"a.js":{"language":"javascript","source":"","mutants":[]}}}"#;
+        let m = registry().detect(content, "mutation.json").unwrap();
+        assert_eq!(m.parser_id, "stryker");
+        assert!(m.score >= 90);
+        assert_eq!(m.result_type, ResultType::Mutation);
+    }
+
+    #[test]
+    fn detect_sarif_json() {
+        let content = r#"{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"ruff"}},"results":[]}]}"#;
+        let m = registry().detect(content, "results.json").unwrap();
+        assert_eq!(m.parser_id, "sarif");
+        assert_eq!(m.score, 90);
+        assert_eq!(m.result_type, ResultType::Findings);
     }
 
     #[test]

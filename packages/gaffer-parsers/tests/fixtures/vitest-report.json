@@ -1,5 +1,5 @@
 {
-  "_fixtureProvenance": "Captured from a real Vitest 3.2.4 `vitest run --reporter=json` (docs/marketing-cycles/2026-08-24/real-vitest-3.2.4-payload.json, see its README), see GAF-211. The only alterations are path scrubbing to /home/runner/work/project/... and this key. Do not hand-edit counters or statuses: replace with a fresh capture instead.",
+  "_fixtureProvenance": "Captured from a real Vitest 3.2.4 `vitest run --reporter=json` (docs/prds/archive/marketing-cycles/2026-08-24/real-vitest-3.2.4-payload.json, see its README), see GAF-211. The only alterations are path scrubbing to /home/runner/work/project/... and this key. Do not hand-edit counters or statuses: replace with a fresh capture instead.",
   "numTotalTestSuites": 5,
   "numPassedTestSuites": 3,
   "numFailedTestSuites": 2,

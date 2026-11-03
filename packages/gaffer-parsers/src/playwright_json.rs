@@ -81,6 +81,10 @@ impl Parser for PlaywrightJsonParser {
             metadata["projects"] = serde_json::json!(project_names);
         }
 
+        if let Some(git_commit) = report.config.metadata.as_ref().and_then(pick_git_commit) {
+            metadata["gitCommit"] = git_commit;
+        }
+
         Ok(ParseResult::TestReport(ParsedReport {
             framework: "playwright".to_string(),
             summary,
@@ -88,6 +92,18 @@ impl Parser for PlaywrightJsonParser {
             metadata,
         }))
     }
+}
+
+/// The commit fields of Playwright's `gitCommit` metadata plugin. Read from
+/// loose JSON because the plugin's shape is not ours: a surprise here must not
+/// fail an otherwise good report. `None` when no field is present.
+fn pick_git_commit(metadata: &serde_json::Value) -> Option<serde_json::Value> {
+    let commit = metadata.get("gitCommit")?;
+    let picked: serde_json::Map<String, serde_json::Value> = ["hash", "branch", "author", "subject"]
+        .iter()
+        .filter_map(|key| commit.get(*key).map(|v| (key.to_string(), v.clone())))
+        .collect();
+    (!picked.is_empty()).then_some(serde_json::Value::Object(picked))
 }
 
 fn collect_test_cases(
@@ -130,6 +146,8 @@ fn collect_test_cases(
 
             let error_message = last_result.and_then(extract_error);
 
+            let error_stack = last_result.and_then(extract_error_stack);
+
             let retry_attempt = last_result.map(|r| r.retry);
 
             let started_at = last_result.and_then(|r| r.start_time.clone());
@@ -140,9 +158,11 @@ fn collect_test_cases(
                 id,
                 name: spec.title.clone(),
                 full_name,
+                suite: None,
                 status,
                 duration_ms,
                 error_message,
+                error_stack,
                 file_path: Some(spec.file.clone()),
                 line: Some(spec.line),
                 retry_attempt,
@@ -194,6 +214,14 @@ fn extract_error(result: &PlaywrightTestResult) -> Option<String> {
     result.error.as_ref().map(|e| e.message.clone())
 }
 
+fn extract_error_stack(result: &PlaywrightTestResult) -> Option<String> {
+    result
+        .error
+        .as_ref()
+        .and_then(|e| e.stack.clone())
+        .or_else(|| result.errors.iter().find_map(|e| e.stack.clone()))
+}
+
 // ============================================================================
 // Input deserialization structs
 // ============================================================================
@@ -212,6 +240,8 @@ struct PlaywrightJsonReport {
 #[serde(rename_all = "camelCase")]
 struct PlaywrightConfig {
     projects: Vec<ProjectConfig>,
+    #[serde(default)]
+    metadata: Option<serde_json::Value>,
 }
 
 #[derive(Deserialize)]
@@ -288,6 +318,8 @@ struct PlaywrightTestResult {
 #[serde(rename_all = "camelCase")]
 struct PlaywrightErrorMessage {
     message: String,
+    #[serde(default)]
+    stack: Option<String>,
 }
 
 #[derive(Deserialize)]
