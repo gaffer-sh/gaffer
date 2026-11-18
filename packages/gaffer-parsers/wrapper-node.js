@@ -44,3 +44,5 @@ export function parse_mutation(content, filename) {
 export function parse_findings(content, filename) {
   return _parse_findings(content, filename)
 }
+
+export { parseTraceNetwork } from './trace-network.js'

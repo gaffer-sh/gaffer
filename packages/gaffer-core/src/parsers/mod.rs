@@ -338,6 +338,7 @@ mod tests {
             retry_attempt: None,
             started_at: None,
             worker_index: None,
+            attachments: Vec::new(),
         };
         let result = convert_test_case(tc);
         assert_eq!(result.status, "failed");
@@ -361,6 +362,7 @@ mod tests {
             retry_attempt: Some(1),
             started_at: None,
             worker_index: None,
+            attachments: Vec::new(),
         };
         let result = convert_test_case(tc);
         assert_eq!(result.status, "passed");

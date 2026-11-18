@@ -135,16 +135,24 @@ fn resolve_token(flag: Option<String>, api_url: Option<&str>) -> Result<String, 
     ))
 }
 
-fn emit_success(outcome: &UploadOutcome, debug: bool) {
-    let json = serde_json::json!({
+fn success_json(outcome: &UploadOutcome) -> serde_json::Value {
+    serde_json::json!({
         "status": "success",
         "uploadSessionId": outcome.upload_session_id,
         "projectId": outcome.project_id,
+        "dashboardUrl": outcome.dashboard_url,
         "filesUploaded": outcome.files_uploaded,
         "bytesUploaded": outcome.bytes_uploaded,
         "elapsedMs": outcome.elapsed_ms,
-    });
-    println!("{}", json);
+    })
+}
+
+fn emit_success(outcome: &UploadOutcome, debug: bool) {
+    println!("{}", success_json(outcome));
+    // stderr, so stdout stays the one JSON line the Action wrapper parses.
+    if let Some(url) = &outcome.dashboard_url {
+        eprintln!("View upload: {url}");
+    }
     if debug {
         eprintln!(
             "[gaffer] uploaded {} bytes in {} responses ({:.2}s)",
@@ -159,34 +167,10 @@ fn emit_success(outcome: &UploadOutcome, debug: bool) {
 /// by a human-readable block with problem / cause / fix / IDs. The Action
 /// wrapper consumes the JSON line; humans see the block.
 fn emit_error(err: &UploadError) {
-    let (kind, status, sid, ray) = match err {
-        UploadError::UserError { kind, .. } => (*kind, None, None, None),
-        UploadError::ServerError {
-            kind,
-            status,
-            upload_session_id,
-            cf_ray_id,
-            ..
-        } => (
-            *kind,
-            *status,
-            upload_session_id.clone(),
-            cf_ray_id.clone(),
-        ),
-        UploadError::Unexpected { kind, .. } => (*kind, None, None, None),
-    };
-
-    let json = serde_json::json!({
-        "status": "error",
-        "kind": kind,
-        "exitCode": err.exit_code(),
-        "message": err.to_string(),
-        "httpStatus": status,
-        "uploadSessionId": sid,
-        "cfRayId": ray,
-        "serverCeilingBytes": err.ceiling(),
-    });
+    let json = error_json(err);
     eprintln!("{}", json);
+    let sid = json["uploadSessionId"].as_str();
+    let ray = json["cfRayId"].as_str();
 
     eprintln!();
     eprintln!("Upload failed.");
@@ -201,12 +185,53 @@ fn emit_error(err: &UploadError) {
             (ceiling as f64) / (1024.0 * 1024.0),
         );
     }
+    if let Some(url) = json["billingUrl"].as_str() {
+        eprintln!("  Upgrade: {}", url);
+    }
+    if let Some(url) = json["claimUrl"].as_str() {
+        eprintln!("  Claim:   {}", url);
+    }
     if let Some(sid) = sid {
         eprintln!("  Upload session: {}", sid);
     }
     if let Some(ray) = ray {
         eprintln!("  Cloudflare Ray ID: {}", ray);
     }
+}
+
+/// The one machine-readable error line the Action wrapper parses.
+fn error_json(err: &UploadError) -> serde_json::Value {
+    let (kind, status, sid, ray, links) = match err {
+        UploadError::UserError { kind, .. } => (*kind, None, None, None, None),
+        UploadError::ServerError {
+            kind,
+            status,
+            upload_session_id,
+            cf_ray_id,
+            quota_links,
+            ..
+        } => (
+            *kind,
+            *status,
+            upload_session_id.clone(),
+            cf_ray_id.clone(),
+            quota_links.as_deref(),
+        ),
+        UploadError::Unexpected { kind, .. } => (*kind, None, None, None, None),
+    };
+
+    serde_json::json!({
+        "status": "error",
+        "kind": kind,
+        "exitCode": err.exit_code(),
+        "message": err.to_string(),
+        "httpStatus": status,
+        "uploadSessionId": sid,
+        "cfRayId": ray,
+        "serverCeilingBytes": err.ceiling(),
+        "billingUrl": links.and_then(|l| l.billing_url.as_deref()),
+        "claimUrl": links.and_then(|l| l.claim_url.as_deref()),
+    })
 }
 
 fn classify_cause(err: &UploadError) -> &'static str {
@@ -272,6 +297,56 @@ mod tests {
     fn clear_token_env() {
         for var in TOKEN_VARS.into_iter().chain(OIDC_VARS) {
             std::env::remove_var(var);
+        }
+    }
+
+    #[test]
+    fn success_json_carries_the_dashboard_url() {
+        let outcome = UploadOutcome {
+            upload_session_id: "upl_1".to_string(),
+            project_id: Some("prj_1".to_string()),
+            dashboard_url: Some("https://app.gaffer.sh/projects/prj_1/uploads/upl_1".to_string()),
+            files_uploaded: 1,
+            bytes_uploaded: 10,
+            elapsed_ms: 5,
+            responses: Vec::new(),
+        };
+
+        let json = success_json(&outcome);
+
+        assert_eq!(json["dashboardUrl"], "https://app.gaffer.sh/projects/prj_1/uploads/upl_1");
+    }
+
+    #[test]
+    fn error_json_carries_the_quota_links_the_server_sent() {
+        let billing = "https://dash.test/settings/billing";
+        let claim = "https://dash.test/claim/org_1";
+        let cases = [
+            (Some(billing), Some(claim)),
+            (Some(billing), None),
+            (None, None),
+        ];
+        for (billing_url, claim_url) in cases {
+            let err = UploadError::ServerError {
+                message: "Upload failed (402): Storage limit exceeded.".to_string(),
+                kind: "quota_exceeded",
+                status: Some(402),
+                upload_session_id: None,
+                cf_ray_id: None,
+                ceiling: None,
+                quota_links: billing_url.map(|b| {
+                    Box::new(upload::QuotaLinks {
+                        billing_url: Some(b.to_string()),
+                        claim_url: claim_url.map(str::to_string),
+                    })
+                }),
+            };
+
+            let json = error_json(&err);
+
+            assert_eq!(json["kind"], "quota_exceeded");
+            assert_eq!(json["billingUrl"].as_str(), billing_url);
+            assert_eq!(json["claimUrl"].as_str(), claim_url);
         }
     }
 

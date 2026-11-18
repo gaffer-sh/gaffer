@@ -10,6 +10,7 @@ mod playwright_json;
 mod sarif;
 mod stryker;
 mod trx;
+pub mod trace_network;
 pub(crate) mod xml_helpers;
 pub mod registry;
 pub mod types;
@@ -106,4 +107,13 @@ pub fn parse_findings(content: &str, filename: &str) -> Result<String, String> {
         Some(Err(e)) => Err(e.message),
         None => Err("No findings parser matched the input".to_string()),
     }
+}
+
+/// Network requests and correlation IDs from a Playwright trace. `network` is
+/// every `.network` file, `trace` the first line of every `.trace` file; the
+/// JS wrapper (`trace-network.js`) unzips and calls this as `parseTraceNetwork`.
+#[wasm_bindgen]
+pub fn parse_trace_network(network: &str, trace: &str) -> Result<String, String> {
+    let parsed = trace_network::parse_trace_network(network, trace)?;
+    serde_json::to_string(&parsed).map_err(|e| format!("JSON serialization failed: {}", e))
 }

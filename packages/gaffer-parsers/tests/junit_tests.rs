@@ -552,3 +552,99 @@ fn test_error_stack_wins_with_error_status_when_both_elements_exist() {
     assert_eq!(failed["errorMessage"], "e");
     assert_eq!(failed["errorStack"], "error body");
 }
+
+// ============================================================================
+// vitest-junit-entities.xml tests (GAF-298): attributes are entity-decoded once
+// ============================================================================
+
+const ENTITY_TEST_NAME: &str = r#"plan <tier> & "quota" > it's > rejects 'pro' > "free" & keeps <limits>"#;
+
+#[test]
+fn test_entities_decoded_in_name_and_suite() {
+    let report = parse_and_check(&load_fixture("vitest-junit-entities.xml"));
+    let tc = find_test(&report, ENTITY_TEST_NAME);
+
+    assert_eq!(tc["suite"], "tests/entities.test.ts");
+    assert_eq!(
+        tc["fullName"],
+        format!("tests/entities.test.ts > {}", ENTITY_TEST_NAME)
+    );
+    assert_eq!(
+        find_test(&report, r#"plan <tier> & "quota" > it's > passes with & in the name"#)["status"],
+        "passed"
+    );
+}
+
+#[test]
+fn test_entities_decoded_in_failure_message_and_body() {
+    let report = parse_and_check(&load_fixture("vitest-junit-entities.xml"));
+    let tc = find_test(&report, ENTITY_TEST_NAME);
+
+    assert_eq!(
+        tc["errorMessage"],
+        "expected { Object (plan, note) } to deeply equal { plan: 'free' }"
+    );
+    let stack = tc["errorStack"].as_str().expect("failure body is the stack");
+    assert!(stack.contains(r#"+   "note": "a < b & \"c\" > d","#), "{stack}");
+    assert!(!stack.contains("&quot;"), "{stack}");
+}
+
+#[test]
+fn test_entities_decoded_exactly_once() {
+    let report = parse_and_check(&load_fixture("vitest-junit-entities.xml"));
+    let tc = find_test(&report, r#"plan <tier> & "quota" > it's > keeps a literal &gt; once"#);
+
+    assert_eq!(
+        tc["errorMessage"],
+        "expected '&gt; literal' to be '&lt; other' // Object.is equality"
+    );
+    assert!(tc["errorStack"].as_str().unwrap().contains(r#"Received: "&gt; literal""#));
+}
+
+// ============================================================================
+// filePath sources (GAF-570): explicit `file` first, then a path-like suite name
+// ============================================================================
+
+#[test]
+fn test_vitest_suite_name_becomes_file_path() {
+    let report = parse_and_check(&load_fixture("vitest-junit-entities.xml"));
+    let tc = find_test(&report, ENTITY_TEST_NAME);
+
+    assert_eq!(tc["filePath"], "tests/entities.test.ts");
+    assert_eq!(tc["suite"], "tests/entities.test.ts");
+}
+
+#[test]
+fn test_pytest_explicit_file_attribute_is_file_path() {
+    let report = parse_and_check(&load_fixture("pytest-junit-xunit1.xml"));
+    let tc = find_test(&report, "test_discount");
+
+    assert_eq!(tc["filePath"], "tests/test_checkout.py");
+    assert_eq!(tc["line"], 4);
+    assert_eq!(tc["suite"], "tests.test_checkout.TestCheckout");
+}
+
+#[test]
+fn test_class_style_suite_name_has_no_file_path() {
+    let report = parse_and_check(&load_fixture("swift-xunit.xml"));
+
+    for tc in report["testCases"].as_array().unwrap() {
+        assert!(tc.get("filePath").is_none(), "{tc}");
+    }
+    assert_eq!(find_test(&report, "testEmpty")["fullName"], "CartTests.CartTests > testEmpty");
+}
+
+#[test]
+fn test_suite_name_path_uses_forward_slashes_and_rejects_non_paths() {
+    let file_path = |suite: &str| {
+        let xml = format!(r#"<testsuite name="{suite}"><testcase name="t"/></testsuite>"#);
+        parse_and_check(&xml)["testCases"][0].get("filePath").cloned()
+    };
+
+    assert_eq!(file_path(r"tests\unit\a.spec.ts"), Some("tests/unit/a.spec.ts".into()));
+    assert_eq!(file_path(r"App\Tests\Unit"), None);
+    assert_eq!(file_path("lib/Foo.MJS"), Some("lib/Foo.MJS".into()));
+    assert_eq!(file_path("com.example.CartTest"), None);
+    assert_eq!(file_path("my suite.ts"), None);
+    assert_eq!(file_path(".ts"), None);
+}

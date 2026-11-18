@@ -131,6 +131,7 @@ fn build_test_case(
         retry_attempt: None,
         started_at: None,
         worker_index: None,
+        attachments: Vec::new(),
     }
 }
 

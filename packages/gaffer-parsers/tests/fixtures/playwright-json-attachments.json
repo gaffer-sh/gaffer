@@ -1,0 +1,256 @@
+{
+  "config": {
+    "configFile": "/private/tmp/claude-501/-Users-alex-projects-gaffer/02e18552-ee06-4730-bb5f-66deae2c3c3f/scratchpad/gaf-185/pw/playwright.config.mjs",
+    "rootDir": "/private/tmp/claude-501/-Users-alex-projects-gaffer/02e18552-ee06-4730-bb5f-66deae2c3c3f/scratchpad/gaf-185/pw/tests",
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "reporter": [
+      [
+        "json",
+        {
+          "outputFile": "results.json"
+        }
+      ],
+      [
+        "html",
+        {
+          "open": "never",
+          "outputFolder": "playwright-report"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "quiet": false,
+    "projects": [
+      {
+        "outputDir": "/private/tmp/claude-501/-Users-alex-projects-gaffer/02e18552-ee06-4730-bb5f-66deae2c3c3f/scratchpad/gaf-185/pw/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/private/tmp/claude-501/-Users-alex-projects-gaffer/02e18552-ee06-4730-bb5f-66deae2c3c3f/scratchpad/gaf-185/pw/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.57.0",
+    "workers": 6,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "attachments.spec.mjs",
+      "file": "attachments.spec.mjs",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "passes with a trace and screenshot",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 142,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-13T15:27:29.169Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "/private/tmp/claude-501/-Users-alex-projects-gaffer/02e18552-ee06-4730-bb5f-66deae2c3c3f/scratchpad/gaf-185/pw/test-results/attachments-passes-with-a-trace-and-screenshot-chromium/test-finished-1.png"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "/private/tmp/claude-501/-Users-alex-projects-gaffer/02e18552-ee06-4730-bb5f-66deae2c3c3f/scratchpad/gaf-185/pw/test-results/attachments-passes-with-a-trace-and-screenshot-chromium/trace.zip"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "f0dfba1100e16330398a-1ae1d11690a6ccf7e959",
+          "file": "attachments.spec.mjs",
+          "line": 2,
+          "column": 1
+        },
+        {
+          "title": "fails with trace, screenshot and video",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 610,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  locator('h1')\nExpected: \u001b[32m\"Goodbye\"\u001b[39m\nReceived: \u001b[31m\"Hello\"\u001b[39m\nTimeout:  500ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveText\" with timeout 500ms\u001b[22m\n\u001b[2m  - waiting for locator('h1')\u001b[22m\n\u001b[2m    4 × locator resolved to <h1>Hello</h1>\u001b[22m\n\u001b[2m      - unexpected value \"Hello\"\u001b[22m\n",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  locator('h1')\nExpected: \u001b[32m\"Goodbye\"\u001b[39m\nReceived: \u001b[31m\"Hello\"\u001b[39m\nTimeout:  500ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveText\" with timeout 500ms\u001b[22m\n\u001b[2m  - waiting for locator('h1')\u001b[22m\n\u001b[2m    4 × locator resolved to <h1>Hello</h1>\u001b[22m\n\u001b[2m      - unexpected value \"Hello\"\u001b[22m\n\n    at /private/tmp/claude-501/-Users-alex-projects-gaffer/02e18552-ee06-4730-bb5f-66deae2c3c3f/scratchpad/gaf-185/pw/tests/attachments.spec.mjs:8:36",
+                    "location": {
+                      "file": "/private/tmp/claude-501/-Users-alex-projects-gaffer/02e18552-ee06-4730-bb5f-66deae2c3c3f/scratchpad/gaf-185/pw/tests/attachments.spec.mjs",
+                      "column": 36,
+                      "line": 8
+                    },
+                    "snippet": "   6 | test('fails with trace, screenshot and video', async ({ page }) => {\n   7 |   await page.setContent('<h1>Hello</h1>')\n>  8 |   await expect(page.locator('h1')).toHaveText('Goodbye', { timeout: 500 })\n     |                                    ^\n   9 | })\n  10 | test('attaches an inline body', async ({ page }, testInfo) => {\n  11 |   await page.setContent('<p>x</p>')"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "/private/tmp/claude-501/-Users-alex-projects-gaffer/02e18552-ee06-4730-bb5f-66deae2c3c3f/scratchpad/gaf-185/pw/tests/attachments.spec.mjs",
+                        "column": 36,
+                        "line": 8
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  locator('h1')\nExpected: \u001b[32m\"Goodbye\"\u001b[39m\nReceived: \u001b[31m\"Hello\"\u001b[39m\nTimeout:  500ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveText\" with timeout 500ms\u001b[22m\n\u001b[2m  - waiting for locator('h1')\u001b[22m\n\u001b[2m    4 × locator resolved to <h1>Hello</h1>\u001b[22m\n\u001b[2m      - unexpected value \"Hello\"\u001b[22m\n\n\n   6 | test('fails with trace, screenshot and video', async ({ page }) => {\n   7 |   await page.setContent('<h1>Hello</h1>')\n>  8 |   await expect(page.locator('h1')).toHaveText('Goodbye', { timeout: 500 })\n     |                                    ^\n   9 | })\n  10 | test('attaches an inline body', async ({ page }, testInfo) => {\n  11 |   await page.setContent('<p>x</p>')\n    at /private/tmp/claude-501/-Users-alex-projects-gaffer/02e18552-ee06-4730-bb5f-66deae2c3c3f/scratchpad/gaf-185/pw/tests/attachments.spec.mjs:8:36"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-13T15:27:29.504Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "/private/tmp/claude-501/-Users-alex-projects-gaffer/02e18552-ee06-4730-bb5f-66deae2c3c3f/scratchpad/gaf-185/pw/test-results/attachments-fails-with-trace-screenshot-and-video-chromium/test-failed-1.png"
+                    },
+                    {
+                      "name": "video",
+                      "contentType": "video/webm",
+                      "path": "/private/tmp/claude-501/-Users-alex-projects-gaffer/02e18552-ee06-4730-bb5f-66deae2c3c3f/scratchpad/gaf-185/pw/test-results/attachments-fails-with-trace-screenshot-and-video-chromium/video.webm"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/private/tmp/claude-501/-Users-alex-projects-gaffer/02e18552-ee06-4730-bb5f-66deae2c3c3f/scratchpad/gaf-185/pw/test-results/attachments-fails-with-trace-screenshot-and-video-chromium/error-context.md"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "/private/tmp/claude-501/-Users-alex-projects-gaffer/02e18552-ee06-4730-bb5f-66deae2c3c3f/scratchpad/gaf-185/pw/test-results/attachments-fails-with-trace-screenshot-and-video-chromium/trace.zip"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "/private/tmp/claude-501/-Users-alex-projects-gaffer/02e18552-ee06-4730-bb5f-66deae2c3c3f/scratchpad/gaf-185/pw/tests/attachments.spec.mjs",
+                    "column": 36,
+                    "line": 8
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "f0dfba1100e16330398a-08449de48d222216edfe",
+          "file": "attachments.spec.mjs",
+          "line": 6,
+          "column": 1
+        },
+        {
+          "title": "attaches an inline body",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 125,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-13T15:27:30.435Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "note",
+                      "contentType": "text/plain",
+                      "body": "aW5saW5lIHRleHQ="
+                    },
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "/private/tmp/claude-501/-Users-alex-projects-gaffer/02e18552-ee06-4730-bb5f-66deae2c3c3f/scratchpad/gaf-185/pw/test-results/attachments-attaches-an-inline-body-chromium/test-finished-1.png"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "/private/tmp/claude-501/-Users-alex-projects-gaffer/02e18552-ee06-4730-bb5f-66deae2c3c3f/scratchpad/gaf-185/pw/test-results/attachments-attaches-an-inline-body-chromium/trace.zip"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "f0dfba1100e16330398a-75761d3588f37f391b1b",
+          "file": "attachments.spec.mjs",
+          "line": 10,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-11-13T15:27:28.867Z",
+    "duration": 1810.698,
+    "expected": 2,
+    "skipped": 0,
+    "unexpected": 1,
+    "flaky": 0
+  }
+}

@@ -107,8 +107,30 @@ fn file_path_from_python_classname(classname: &str) -> Option<String> {
     Some(format!("{}.py", segments[..=module].join("/")))
 }
 
+/// Source extensions a testsuite name must end in to be read as a test file.
+const TEST_SOURCE_EXTENSIONS: &[&str] = &[
+    "ts", "tsx", "mts", "cts", "js", "jsx", "mjs", "cjs", "vue", "svelte", "py", "rb", "go",
+    "rs", "java", "kt", "kts", "scala", "groovy", "cs", "fs", "vb", "php", "swift", "dart",
+    "ex", "exs", "cpp", "cc", "cxx", "feature",
+];
+
+/// Vitest's JUnit reporter names each testsuite after its test file. Read the
+/// name as a path only when it has no whitespace and a test-source extension,
+/// so a `com.foo.BarTest` or `App\Tests\Unit` suite never becomes a path.
+fn file_path_from_suite_name(name: &str) -> Option<String> {
+    if name.chars().any(char::is_whitespace) {
+        return None;
+    }
+    let path = name.replace('\\', "/");
+    let file_name = path.rsplit('/').next()?;
+    let (stem, ext) = file_name.rsplit_once('.')?;
+    let ext = ext.to_ascii_lowercase();
+    (!stem.is_empty() && TEST_SOURCE_EXTENSIONS.contains(&ext.as_str())).then_some(path)
+}
+
 fn finalize_testcase(ctx: TestcaseContext, id: usize, suite_file: Option<&str>) -> TestCase {
     let name = ctx.name;
+    let suite_name_file_path = file_path_from_suite_name(&ctx.suite_name);
     let derived_file_path = ctx.classname.as_deref().and_then(file_path_from_python_classname);
     let suite = ctx.classname.unwrap_or(ctx.suite_name);
 
@@ -148,6 +170,7 @@ fn finalize_testcase(ctx: TestcaseContext, id: usize, suite_file: Option<&str>) 
     let file_path = ctx
         .file
         .or_else(|| suite_file.map(|s| s.to_string()))
+        .or(suite_name_file_path)
         .or(derived_file_path);
 
     TestCase {
@@ -164,6 +187,7 @@ fn finalize_testcase(ctx: TestcaseContext, id: usize, suite_file: Option<&str>) 
         retry_attempt: None,
         started_at: None,
         worker_index: None,
+        attachments: Vec::new(),
     }
 }
 

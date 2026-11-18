@@ -10,10 +10,17 @@ pub fn strip_bom(input: &str) -> &str {
 }
 
 /// Extract a string attribute value from a `BytesStart` element by attribute name.
+///
+/// The value is entity-decoded exactly once (`&amp;gt;` becomes `&gt;`). A value
+/// with a malformed entity falls back to its raw text rather than being dropped.
 pub fn get_attr(e: &quick_xml::events::BytesStart, name: &[u8]) -> Option<String> {
     for attr in e.attributes().flatten() {
         if attr.key.as_ref() == name {
-            return String::from_utf8(attr.value.to_vec()).ok();
+            return attr
+                .unescape_value()
+                .map(|v| v.into_owned())
+                .ok()
+                .or_else(|| String::from_utf8(attr.value.to_vec()).ok());
         }
     }
     None
@@ -96,6 +103,30 @@ mod tests {
     #[test]
     fn strip_bom_empty() {
         assert_eq!(strip_bom(""), "");
+    }
+
+    fn first_start_attr(xml: &str, name: &[u8]) -> Option<String> {
+        let mut reader = quick_xml::Reader::from_str(xml);
+        match reader.read_event() {
+            Ok(quick_xml::events::Event::Empty(ref e)) => get_attr(e, name),
+            other => panic!("expected an empty element, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn get_attr_decodes_numeric_character_references() {
+        assert_eq!(
+            first_start_attr(r#"<t name="it&#39;s &#x27;x&#x27;"/>"#, b"name").as_deref(),
+            Some("it's 'x'")
+        );
+    }
+
+    #[test]
+    fn get_attr_keeps_raw_text_on_malformed_entity() {
+        assert_eq!(
+            first_start_attr(r#"<t name="a &bogus; b"/>"#, b"name").as_deref(),
+            Some("a &bogus; b")
+        );
     }
 
     #[test]

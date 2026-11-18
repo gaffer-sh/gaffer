@@ -636,3 +636,108 @@ fn test_playwright_started_at_absent_when_test_never_ran() {
     assert!(skipped.get("startedAt").is_none());
     assert!(skipped.get("workerIndex").is_none());
 }
+
+// ============================================================================
+// Real reporter output (GAF-413)
+// ============================================================================
+
+/// `--reporter=json` from @playwright/test 1.57.0: 51 tests over three files,
+/// `retries: 1`, one flaky, two failing, one `test.skip`.
+const REAL_REPORT: &str = "playwright-json-reporter-large.json";
+
+#[test]
+fn test_playwright_real_report_keeps_stats_past_the_detection_sample() {
+    let json = load_fixture(REAL_REPORT);
+    let stats = json.rfind("\"stats\"").unwrap();
+    assert!(stats > 10240, "fixture no longer exercises GAF-413: stats at {}", stats);
+    assert!(json.find("\"suites\"").unwrap() < stats);
+
+    // Why the dashboard must detect on the whole file: the head alone misses.
+    let registry = ParserRegistry::with_defaults();
+    let head = &json[..10240];
+    assert!(registry.detect(head, "results.json").is_none());
+    assert_eq!(registry.detect(&json, "results.json").map(|m| m.parser_id).as_deref(), Some("playwright-json"));
+}
+
+#[test]
+fn test_playwright_real_report_summary() {
+    let json = load_fixture(REAL_REPORT);
+    let report = parse_via_registry(&json, "results.json");
+
+    let summary = &report["data"]["summary"];
+    assert_eq!(summary["passed"], 47);
+    assert_eq!(summary["failed"], 2);
+    assert_eq!(summary["skipped"], 1);
+    assert_eq!(summary["flaky"], 1);
+    assert_eq!(summary["total"], 51);
+    assert_eq!(report["data"]["testCases"].as_array().unwrap().len(), 51);
+}
+
+#[test]
+fn test_playwright_skipped_result_with_negative_worker_index() {
+    let json = load_fixture(REAL_REPORT);
+    assert!(json.contains("\"workerIndex\": -1"));
+    let report = parse_via_registry(&json, "results.json");
+
+    let test_cases = report["data"]["testCases"].as_array().unwrap();
+    let skipped = test_cases.iter().find(|tc| tc["status"] == "skipped").unwrap();
+    assert!(skipped.get("workerIndex").is_none());
+}
+
+// ============================================================================
+// Attachments (GAF-185)
+// ============================================================================
+
+/// `--reporter=json` from @playwright/test 1.57.0 with `trace: 'on'`,
+/// `screenshot: 'on'`, `video: 'retain-on-failure'`: one pass, one failure,
+/// one test that also attaches an inline `body`.
+const ATTACHMENTS_REPORT: &str = "playwright-json-attachments.json";
+
+fn attachments_of<'a>(report: &'a serde_json::Value, name: &str) -> &'a Vec<serde_json::Value> {
+    report["data"]["testCases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|tc| tc["name"] == name)
+        .unwrap()["attachments"]
+        .as_array()
+        .unwrap()
+}
+
+#[test]
+fn test_playwright_keeps_trace_and_screenshot_attachments() {
+    let json = load_fixture(ATTACHMENTS_REPORT);
+    let report = parse_via_registry(&json, "results.json");
+
+    let attachments = attachments_of(&report, "fails with trace, screenshot and video");
+    let names: Vec<&str> = attachments.iter().map(|a| a["name"].as_str().unwrap()).collect();
+    assert_eq!(names, ["screenshot", "video", "error-context", "trace"]);
+
+    let trace = &attachments[3];
+    assert_eq!(trace["contentType"], "application/zip");
+    assert!(trace["path"]
+        .as_str()
+        .unwrap()
+        .ends_with("/test-results/attachments-fails-with-trace-screenshot-and-video-chromium/trace.zip"));
+}
+
+#[test]
+fn test_playwright_drops_inline_body_attachments() {
+    let json = load_fixture(ATTACHMENTS_REPORT);
+    assert!(json.contains("\"body\": \"aW5saW5lIHRleHQ=\""));
+    let report = parse_via_registry(&json, "results.json");
+
+    let attachments = attachments_of(&report, "attaches an inline body");
+    let names: Vec<&str> = attachments.iter().map(|a| a["name"].as_str().unwrap()).collect();
+    assert_eq!(names, ["screenshot", "trace"]);
+}
+
+#[test]
+fn test_playwright_omits_attachments_when_there_are_none() {
+    let json = load_fixture("playwright-json-report.json");
+    let report = parse_via_registry(&json, "playwright-results.json");
+
+    for tc in report["data"]["testCases"].as_array().unwrap() {
+        assert!(tc.get("attachments").is_none());
+    }
+}

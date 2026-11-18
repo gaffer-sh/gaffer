@@ -34,6 +34,14 @@ use tokio::sync::Semaphore;
 
 const DEFAULT_API_URL: &str = "https://app.gaffer.sh";
 
+/// Dashboard page for an upload session. Links to the session rather than the
+/// run because the run page does not exist until ingestion finishes. The API
+/// and the dashboard share a host, so an `api_url` override moves both.
+pub fn dashboard_session_url(api_url: Option<&str>, project_id: &str, session_id: &str) -> String {
+    let base = api_url.unwrap_or(DEFAULT_API_URL).trim_end_matches('/');
+    format!("{base}/projects/{project_id}/uploads/{session_id}")
+}
+
 /// Largest request body `/api/upload` will accept. Must equal
 /// `MAX_V1_UPLOAD_SIZE_BYTES` in `@gaffer/pricing`; the server rejects a
 /// larger `Content-Length` with a 413 before the handler runs.
@@ -274,6 +282,8 @@ pub(crate) struct UploadFile {
 pub struct UploadOutcome {
     pub upload_session_id: String,
     pub project_id: Option<String>,
+    /// `None` only when the server's response names no project.
+    pub dashboard_url: Option<String>,
     pub files_uploaded: usize,
     pub bytes_uploaded: u64,
     pub elapsed_ms: u128,
@@ -321,6 +331,14 @@ pub struct SessionRef {
     pub processing_status: Option<String>,
 }
 
+/// Links the server sent with a 402 `quota_exceeded` (GAF-663). Printed as
+/// text, never opened: the client only echoes what the server sent.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct QuotaLinks {
+    pub billing_url: Option<String>,
+    pub claim_url: Option<String>,
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum UploadError {
     #[error("{message}")]
@@ -338,6 +356,9 @@ pub enum UploadError {
         /// Byte ceiling the server reported in a 413 envelope, when it sent
         /// one. Routing re-plans against this instead of failing the run.
         ceiling: Option<u64>,
+        /// Links from a 402 `quota_exceeded` envelope. Boxed to keep the
+        /// error under clippy's `result_large_err` limit.
+        quota_links: Option<Box<QuotaLinks>>,
     },
     #[error("{message}")]
     Unexpected {
@@ -362,6 +383,7 @@ impl UploadError {
             upload_session_id: None,
             cf_ray_id: None,
             ceiling: None,
+            quota_links: None,
         }
     }
 
@@ -488,6 +510,9 @@ pub async fn run(paths: &[PathBuf], config: &UploadConfig) -> UploadResult<Uploa
     Ok(UploadOutcome {
         upload_session_id: response.upload_session.id.clone(),
         project_id: response.upload_session.project_id.clone(),
+        dashboard_url: response.upload_session.project_id.as_deref().map(|project_id| {
+            dashboard_session_url(config.api_url.as_deref(), project_id, &response.upload_session.id)
+        }),
         files_uploaded: total_files,
         bytes_uploaded: total_bytes,
         elapsed_ms: start.elapsed().as_millis(),
@@ -1440,6 +1465,11 @@ async fn server_error_from_response(label: &str, resp: Response) -> UploadError 
             err = err.with_ceiling(ceiling);
         }
     }
+    if status == 402 && envelope.quota_links != QuotaLinks::default() {
+        if let UploadError::ServerError { quota_links, .. } = &mut err {
+            *quota_links = Some(Box::new(envelope.quota_links));
+        }
+    }
     err
 }
 
@@ -1451,6 +1481,8 @@ struct ErrorEnvelope {
     /// `data.ceiling` from the v1 413 (`file_too_large_for_v1`). The server's
     /// live `MAX_V1_UPLOAD_SIZE_BYTES`, which may differ from our default.
     ceiling: Option<u64>,
+    /// `data.billing_url` / `data.claim_url` from the 402 `quota_exceeded`.
+    quota_links: QuotaLinks,
 }
 
 /// Try to extract a human message + uploadSessionId + ceiling from the H3
@@ -1462,7 +1494,16 @@ fn parse_error_body(body: &str) -> ErrorEnvelope {
             message: body.to_string(),
             upload_session_id: None,
             ceiling: None,
+            quota_links: QuotaLinks::default(),
         };
+    };
+    // Untrusted text for the terminal: drop a blank value, or one carrying
+    // control characters (escape sequences), rather than echo it.
+    let link = |p: &str| {
+        v.pointer(p)
+            .and_then(|s| s.as_str())
+            .filter(|s| !s.trim().is_empty() && !s.chars().any(char::is_control))
+            .map(|s| s.to_string())
     };
     ErrorEnvelope {
         message: v
@@ -1480,6 +1521,10 @@ fn parse_error_body(body: &str) -> ErrorEnvelope {
             .pointer("/data/ceiling")
             .or_else(|| v.get("ceiling"))
             .and_then(|c| c.as_u64()),
+        quota_links: QuotaLinks {
+            billing_url: link("/data/billing_url"),
+            claim_url: link("/data/claim_url"),
+        },
     }
 }
 
@@ -1521,6 +1566,22 @@ mod tests {
     use super::*;
     use std::path::PathBuf;
     use tempfile::TempDir;
+
+    #[test]
+    fn dashboard_session_url_uses_the_default_host() {
+        assert_eq!(
+            dashboard_session_url(None, "prj_1", "upl_1"),
+            "https://app.gaffer.sh/projects/prj_1/uploads/upl_1"
+        );
+    }
+
+    #[test]
+    fn dashboard_session_url_follows_an_api_url_override() {
+        assert_eq!(
+            dashboard_session_url(Some("https://gaffer.example.com/"), "prj_1", "upl_1"),
+            "https://gaffer.example.com/projects/prj_1/uploads/upl_1"
+        );
+    }
 
     fn cfg() -> UploadConfig {
         UploadConfig {

@@ -183,6 +183,9 @@ pub fn print_sync(result: &SyncResult) {
             "{}",
             format!("Synced: {} uploaded", plural(result.synced as usize, "run")).green()
         );
+        for url in &result.dashboard_urls {
+            eprintln!("   {url}");
+        }
     }
     if result.failed > 0 {
         eprintln!(

@@ -10,10 +10,11 @@
 //! Uses `ureq` (blocking HTTP) instead of `reqwest` (async) because `sync()`
 //! runs after test output — no need for tokio/async complexity.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::db::Database;
 use crate::types::{CoverageMetrics, FileCoverageEntry, SyncResult};
+use crate::upload::dashboard_session_url;
 
 const MAX_ATTEMPTS: i32 = 5;
 const DEFAULT_API_URL: &str = "https://app.gaffer.sh";
@@ -167,6 +168,21 @@ pub fn build_ingest_payload(
     })
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct IngestResponse {
+    upload_session_id: String,
+    project_id: Option<String>,
+}
+
+/// The upload already succeeded by the time this runs, so a body that can't
+/// be read as a link (an older server sends no `projectId`) yields `None`.
+fn dashboard_url_from_response(api_url: Option<&str>, body: &str) -> Option<String> {
+    let response: IngestResponse = serde_json::from_str(body).ok()?;
+    let project_id = response.project_id?;
+    Some(dashboard_session_url(api_url, &project_id, &response.upload_session_id))
+}
+
 /// Attempt to sync all pending uploads to the Gaffer dashboard.
 pub fn try_sync(db: &Database, token: &str, api_url: Option<&str>) -> SyncResult {
     let base_url = api_url.unwrap_or(DEFAULT_API_URL).trim_end_matches('/');
@@ -179,6 +195,7 @@ pub fn try_sync(db: &Database, token: &str, api_url: Option<&str>) -> SyncResult
             return SyncResult {
                 synced: 0,
                 failed: 1,
+                dashboard_urls: Vec::new(),
             };
         }
     };
@@ -186,6 +203,7 @@ pub fn try_sync(db: &Database, token: &str, api_url: Option<&str>) -> SyncResult
     let mut result = SyncResult {
         synced: 0,
         failed: 0,
+        dashboard_urls: Vec::new(),
     };
 
     // 30-second timeout prevents sync from hanging indefinitely
@@ -221,6 +239,8 @@ pub fn try_sync(db: &Database, token: &str, api_url: Option<&str>) -> SyncResult
                         result.failed += 1;
                     } else {
                         result.synced += 1;
+                        let body = response.into_body().read_to_string().unwrap_or_default();
+                        result.dashboard_urls.extend(dashboard_url_from_response(api_url, &body));
                     }
                 } else {
                     let body = match response.into_body().read_to_string() {
@@ -268,6 +288,30 @@ mod tests {
         let db_path = dir.path().join("data.db");
         let db = Database::open(&db_path).unwrap();
         (db, dir)
+    }
+
+    #[test]
+    fn dashboard_url_from_response_uses_the_default_host() {
+        let body = r#"{"uploadSessionId":"upl_1","projectId":"prj_1"}"#;
+        assert_eq!(
+            dashboard_url_from_response(None, body).as_deref(),
+            Some("https://app.gaffer.sh/projects/prj_1/uploads/upl_1")
+        );
+    }
+
+    #[test]
+    fn dashboard_url_from_response_follows_an_api_url_override() {
+        let body = r#"{"uploadSessionId":"upl_1","projectId":"prj_1"}"#;
+        assert_eq!(
+            dashboard_url_from_response(Some("http://localhost:3000"), body).as_deref(),
+            Some("http://localhost:3000/projects/prj_1/uploads/upl_1")
+        );
+    }
+
+    #[test]
+    fn dashboard_url_from_response_is_none_when_the_server_names_no_project() {
+        assert_eq!(dashboard_url_from_response(None, r#"{"uploadSessionId":"upl_1"}"#), None);
+        assert_eq!(dashboard_url_from_response(None, ""), None);
     }
 
     #[test]

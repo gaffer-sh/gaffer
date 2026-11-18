@@ -359,6 +359,9 @@ pub struct AffectedTestsResult {
 pub struct SyncResult {
     pub synced: u32,
     pub failed: u32,
+    /// One per synced run whose response named its project.
+    #[serde(default)]
+    pub dashboard_urls: Vec<String>,
 }
 
 /// A pending upload row from SQLite (internal).

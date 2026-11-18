@@ -89,6 +89,7 @@ impl Parser for CtrfParser {
                     retry_attempt: test.retries.map(|r| r as u32),
                     started_at: None,
                     worker_index: None,
+                    attachments: Vec::new(),
                 }
             })
             .collect();

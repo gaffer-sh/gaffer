@@ -701,6 +701,62 @@ async fn mid_session_failure_reports_the_session_id() {
     }
 }
 
+/// GAF-663. A 402 `quota_exceeded` carries the links the dashboard sent
+/// (`data.billing_url`, and `data.claim_url` for an unclaimed repo-org), and
+/// a body without them, JSON or not, still yields the plain quota error.
+#[tokio::test]
+async fn quota_402_carries_the_links_the_server_sent() {
+    let billing = "https://dash.test/settings/billing";
+    let claim = "https://dash.test/claim/org_1";
+    let message = "Storage limit exceeded. Upgrade your plan for more storage.";
+    let cases = [
+        (
+            json!({ "statusMessage": message, "data": { "reason": "quota_exceeded", "claim_url": claim, "billing_url": billing } }).to_string(),
+            Some(billing),
+            Some(claim),
+        ),
+        (
+            json!({ "statusMessage": message, "data": { "reason": "quota_exceeded", "billing_url": billing } }).to_string(),
+            Some(billing),
+            None,
+        ),
+        (
+            json!({ "statusMessage": message, "data": { "reason": "quota_exceeded" } }).to_string(),
+            None,
+            None,
+        ),
+        (
+            json!({ "statusMessage": message, "data": { "reason": "quota_exceeded", "claim_url": "", "billing_url": "  " } }).to_string(),
+            None,
+            None,
+        ),
+        (message.to_string(), None, None),
+    ];
+
+    for (body, want_billing, want_claim) in cases {
+        let server = MockServer::start().await;
+        let dir = TempDir::new().unwrap();
+        let report = make_file(&dir, "report.xml", 1024);
+        Mock::given(method("POST"))
+            .and(path("/api/upload"))
+            .respond_with(ResponseTemplate::new(402).set_body_string(body))
+            .mount(&server)
+            .await;
+
+        let err = upload::run(&[report], &cfg(&server.uri())).await.unwrap_err();
+        assert_eq!(err.kind(), "quota_exceeded");
+        assert!(err.to_string().contains("Storage limit exceeded"));
+        match err {
+            upload::UploadError::ServerError { quota_links, .. } => {
+                let links = quota_links.map(|l| *l).unwrap_or_default();
+                assert_eq!(links.billing_url.as_deref(), want_billing);
+                assert_eq!(links.claim_url.as_deref(), want_claim);
+            }
+            other => panic!("expected a server error, got {:?}", other),
+        }
+    }
+}
+
 /// GAF-255. Before the fix a 413 was terminal: the CLI discarded the
 /// `ceiling` the server stated and failed the run with `file_too_large` and a
 /// fix hint about a 5 GB MPU limit that had nothing to do with the rejection.

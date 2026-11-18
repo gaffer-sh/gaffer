@@ -1,7 +1,7 @@
 use serde::Deserialize;
 
 use crate::registry::Parser;
-use crate::types::{ParseError, ParseResult, ParsedReport, ResultType, Summary, TestCase, TestStatus};
+use crate::types::{Attachment, ParseError, ParseResult, ParsedReport, ResultType, Summary, TestCase, TestStatus};
 
 pub struct PlaywrightJsonParser;
 
@@ -152,7 +152,10 @@ fn collect_test_cases(
 
             let started_at = last_result.and_then(|r| r.start_time.clone());
 
-            let worker_index = last_result.and_then(|r| r.worker_index);
+            // Playwright writes -1 for a result that never reached a worker (test.skip).
+            let worker_index = last_result
+                .and_then(|r| r.worker_index)
+                .and_then(|i| u32::try_from(i).ok());
 
             test_cases.push(TestCase {
                 id,
@@ -168,6 +171,7 @@ fn collect_test_cases(
                 retry_attempt,
                 started_at,
                 worker_index,
+                attachments: last_result.map(extract_attachments).unwrap_or_default(),
             });
         }
     }
@@ -220,6 +224,21 @@ fn extract_error_stack(result: &PlaywrightTestResult) -> Option<String> {
         .as_ref()
         .and_then(|e| e.stack.clone())
         .or_else(|| result.errors.iter().find_map(|e| e.stack.clone()))
+}
+
+/// File attachments only: an inline `body` attachment has no path and is dropped.
+fn extract_attachments(result: &PlaywrightTestResult) -> Vec<Attachment> {
+    result
+        .attachments
+        .iter()
+        .filter_map(|a| {
+            Some(Attachment {
+                name: a.name.clone(),
+                content_type: a.content_type.clone(),
+                path: a.path.clone()?,
+            })
+        })
+        .collect()
 }
 
 // ============================================================================
@@ -306,12 +325,21 @@ struct PlaywrightTestResult {
     #[serde(default)]
     errors: Vec<PlaywrightErrorMessage>,
     retry: u32,
-    #[allow(dead_code)]
-    attachments: Vec<serde_json::Value>,
+    #[serde(default)]
+    attachments: Vec<PlaywrightAttachment>,
     #[serde(default)]
     start_time: Option<String>,
     #[serde(default)]
-    worker_index: Option<u32>,
+    worker_index: Option<i64>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PlaywrightAttachment {
+    name: String,
+    content_type: String,
+    #[serde(default)]
+    path: Option<String>,
 }
 
 #[derive(Deserialize)]

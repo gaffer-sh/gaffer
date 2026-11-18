@@ -54,6 +54,20 @@ pub struct TestCase {
     /// Index of the parallel worker that ran the test, when the format reports it.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub worker_index: Option<u32>,
+    /// Files the test attached (trace, screenshot, video), from its last attempt.
+    /// Only Playwright JSON populates this.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub attachments: Vec<Attachment>,
+}
+
+/// A file a test attached, at the path the reporter wrote (often an absolute
+/// CI-machine path). Inline `body` attachments are not kept.
+#[derive(Debug, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Attachment {
+    pub name: String,
+    pub content_type: String,
+    pub path: String,
 }
 
 #[derive(Debug, Serialize, PartialEq)]

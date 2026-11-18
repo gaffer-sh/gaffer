@@ -1,0 +1,2029 @@
+{
+  "config": {
+    "configFile": "/home/runner/work/gaffer/fixture/playwright.config.ts",
+    "rootDir": "/home/runner/work/gaffer/fixture/tests",
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 2
+    },
+    "preserveOutput": "always",
+    "reporter": [
+      [
+        "json",
+        {
+          "outputFile": "playwright-report.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "quiet": false,
+    "projects": [
+      {
+        "outputDir": "/home/runner/work/gaffer/fixture/test-results",
+        "repeatEach": 1,
+        "retries": 1,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "unit",
+        "name": "unit",
+        "testDir": "/home/runner/work/gaffer/fixture/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.57.0",
+    "workers": 2,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "report-parsing.spec.ts",
+      "file": "report-parsing.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "report parsing",
+          "file": "report-parsing.spec.ts",
+          "line": 5,
+          "column": 6,
+          "specs": [
+            {
+              "title": "detects junit",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unit",
+                  "projectName": "unit",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-04T15:01:29.599Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "92d182b83571876bd6c6-29fa7172960db6a905fd",
+              "file": "report-parsing.spec.ts",
+              "line": 7,
+              "column": 9
+            },
+            {
+              "title": "parses junit summary counts",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unit",
+                  "projectName": "unit",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-04T15:01:29.610Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "92d182b83571876bd6c6-fed1a65b489c496b6a72",
+              "file": "report-parsing.spec.ts",
+              "line": 10,
+              "column": 9
+            },
+            {
+              "title": "detects ctrf",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unit",
+                  "projectName": "unit",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-04T15:01:29.618Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "92d182b83571876bd6c6-ec592308063a8a209ac9",
+              "file": "report-parsing.spec.ts",
+              "line": 7,
+              "column": 9
+            },
+            {
+              "title": "parses ctrf summary counts",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unit",
+                  "projectName": "unit",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-04T15:01:29.623Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "92d182b83571876bd6c6-b06db9b0c683f5cdef30",
+              "file": "report-parsing.spec.ts",
+              "line": 10,
+              "column": 9
+            },
+            {
+              "title": "detects playwright-json",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unit",
+                  "projectName": "unit",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-04T15:01:29.628Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "92d182b83571876bd6c6-13e2e729d6403b61ab6b",
+              "file": "report-parsing.spec.ts",
+              "line": 7,
+              "column": 9
+            },
+            {
+              "title": "parses playwright-json summary counts",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unit",
+                  "projectName": "unit",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-04T15:01:29.633Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "92d182b83571876bd6c6-c43140fab95316c0dd5e",
+              "file": "report-parsing.spec.ts",
+              "line": 10,
+              "column": 9
+            },
+            {
+              "title": "detects jest",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unit",
+                  "projectName": "unit",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-04T15:01:29.640Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "92d182b83571876bd6c6-b6641745f30a2107b235",
+              "file": "report-parsing.spec.ts",
+              "line": 7,
+              "column": 9
+            },
+            {
+              "title": "parses jest summary counts",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unit",
+                  "projectName": "unit",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-04T15:01:29.646Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "92d182b83571876bd6c6-ba9ef3fe4bbc7614ac91",
+              "file": "report-parsing.spec.ts",
+              "line": 10,
+              "column": 9
+            },
+            {
+              "title": "detects vitest",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unit",
+                  "projectName": "unit",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-04T15:01:29.650Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "92d182b83571876bd6c6-ba2e19aa3685f32ee961",
+              "file": "report-parsing.spec.ts",
+              "line": 7,
+              "column": 9
+            },
+            {
+              "title": "parses vitest summary counts",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unit",
+                  "projectName": "unit",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-04T15:01:29.655Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "92d182b83571876bd6c6-b20eda162d816c44d010",
+              "file": "report-parsing.spec.ts",
+              "line": 10,
+              "column": 9
+            },
+            {
+              "title": "detects trx",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unit",
+                  "projectName": "unit",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-04T15:01:29.658Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "92d182b83571876bd6c6-ff04b9ad8b371c5443fa",
+              "file": "report-parsing.spec.ts",
+              "line": 7,
+              "column": 9
+            },
+            {
+              "title": "parses trx summary counts",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unit",
+                  "projectName": "unit",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-04T15:01:29.662Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "92d182b83571876bd6c6-abaf061cc29665d126aa",
+              "file": "report-parsing.spec.ts",
+              "line": 10,
+              "column": 9
+            },
+            {
+              "title": "detects lcov",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unit",
+                  "projectName": "unit",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-04T15:01:29.665Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "92d182b83571876bd6c6-5f1143a27860692a74d8",
+              "file": "report-parsing.spec.ts",
+              "line": 7,
+              "column": 9
+            },
+            {
+              "title": "parses lcov summary counts",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unit",
+                  "projectName": "unit",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-04T15:01:29.669Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "92d182b83571876bd6c6-b7b9ed5529222b4db60c",
+              "file": "report-parsing.spec.ts",
+              "line": 10,
+              "column": 9
+            },
+            {
+              "title": "detects cobertura",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unit",
+                  "projectName": "unit",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-04T15:01:29.672Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "92d182b83571876bd6c6-be4a9944c5c81a8cc50a",
+              "file": "report-parsing.spec.ts",
+              "line": 7,
+              "column": 9
+            },
+            {
+              "title": "parses cobertura summary counts",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unit",
+                  "projectName": "unit",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-04T15:01:29.676Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "92d182b83571876bd6c6-6442c0512a475bb597f0",
+              "file": "report-parsing.spec.ts",
+              "line": 10,
+              "column": 9
+            },
+            {
+              "title": "detects jacoco",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unit",
+                  "projectName": "unit",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-04T15:01:29.679Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "92d182b83571876bd6c6-add24dd9a477c1619746",
+              "file": "report-parsing.spec.ts",
+              "line": 7,
+              "column": 9
+            },
+            {
+              "title": "parses jacoco summary counts",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unit",
+                  "projectName": "unit",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-04T15:01:29.682Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "92d182b83571876bd6c6-0013dff719bbb3feb926",
+              "file": "report-parsing.spec.ts",
+              "line": 10,
+              "column": 9
+            },
+            {
+              "title": "detects clover",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unit",
+                  "projectName": "unit",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-04T15:01:29.686Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "92d182b83571876bd6c6-1664ae67289621de091d",
+              "file": "report-parsing.spec.ts",
+              "line": 7,
+              "column": 9
+            },
+            {
+              "title": "parses clover summary counts",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unit",
+                  "projectName": "unit",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-04T15:01:29.689Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "92d182b83571876bd6c6-f79b40ad7fee5df67ebe",
+              "file": "report-parsing.spec.ts",
+              "line": 10,
+              "column": 9
+            },
+            {
+              "title": "detects sarif",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unit",
+                  "projectName": "unit",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-04T15:01:29.692Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "92d182b83571876bd6c6-ed1dff449dd1705b88b6",
+              "file": "report-parsing.spec.ts",
+              "line": 7,
+              "column": 9
+            },
+            {
+              "title": "parses sarif summary counts",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unit",
+                  "projectName": "unit",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-04T15:01:29.695Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "92d182b83571876bd6c6-91f1e8ec4bfffd516190",
+              "file": "report-parsing.spec.ts",
+              "line": 10,
+              "column": 9
+            },
+            {
+              "title": "detects stryker",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unit",
+                  "projectName": "unit",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-04T15:01:29.698Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "92d182b83571876bd6c6-19ab2c414d0a1807a58c",
+              "file": "report-parsing.spec.ts",
+              "line": 7,
+              "column": 9
+            },
+            {
+              "title": "parses stryker summary counts",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unit",
+                  "projectName": "unit",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-04T15:01:29.701Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "92d182b83571876bd6c6-83485c8ef56f994772fc",
+              "file": "report-parsing.spec.ts",
+              "line": 10,
+              "column": 9
+            },
+            {
+              "title": "retries a detector that was flaky on the first attempt",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unit",
+                  "projectName": "unit",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 1,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m1\u001b[39m\nReceived: \u001b[31m0\u001b[39m",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m1\u001b[39m\nReceived: \u001b[31m0\u001b[39m\n    at /home/runner/work/gaffer/fixture/tests/report-parsing.spec.ts:16:28",
+                        "location": {
+                          "file": "/home/runner/work/gaffer/fixture/tests/report-parsing.spec.ts",
+                          "column": 28,
+                          "line": 16
+                        },
+                        "snippet": "  14 |\n  15 |   test('retries a detector that was flaky on the first attempt', ({}, testInfo) => {\n> 16 |     expect(testInfo.retry).toBe(1)\n     |                            ^\n  17 |   })\n  18 | })\n  19 |"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/home/runner/work/gaffer/fixture/tests/report-parsing.spec.ts",
+                            "column": 28,
+                            "line": 16
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m1\u001b[39m\nReceived: \u001b[31m0\u001b[39m\n\n  14 |\n  15 |   test('retries a detector that was flaky on the first attempt', ({}, testInfo) => {\n> 16 |     expect(testInfo.retry).toBe(1)\n     |                            ^\n  17 |   })\n  18 | })\n  19 |\n    at /home/runner/work/gaffer/fixture/tests/report-parsing.spec.ts:16:28"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-04T15:01:29.705Z",
+                      "annotations": [],
+                      "attachments": [],
+                      "errorLocation": {
+                        "file": "/home/runner/work/gaffer/fixture/tests/report-parsing.spec.ts",
+                        "column": 28,
+                        "line": 16
+                      }
+                    },
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 1,
+                      "startTime": "2026-11-04T15:01:29.983Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "flaky"
+                }
+              ],
+              "id": "92d182b83571876bd6c6-16ee4d38ad7e6a8db06a",
+              "file": "report-parsing.spec.ts",
+              "line": 15,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "share-links.spec.ts",
+      "file": "share-links.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "share links",
+          "file": "share-links.spec.ts",
+          "line": 3,
+          "column": 6,
+          "specs": [
+            {
+              "title": "resolves share link 1",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unit",
+                  "projectName": "unit",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 2,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-04T15:01:29.599Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "591eb4d23313562f12c7-3f8d0a8d1a6f45572dfe",
+              "file": "share-links.spec.ts",
+              "line": 5,
+              "column": 9
+            },
+            {
+              "title": "resolves share link 2",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unit",
+                  "projectName": "unit",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 1,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-04T15:01:29.610Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "591eb4d23313562f12c7-5133ad5ca84081677861",
+              "file": "share-links.spec.ts",
+              "line": 5,
+              "column": 9
+            },
+            {
+              "title": "resolves share link 3",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unit",
+                  "projectName": "unit",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-04T15:01:29.617Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "591eb4d23313562f12c7-a2086cccf03ee47fd249",
+              "file": "share-links.spec.ts",
+              "line": 5,
+              "column": 9
+            },
+            {
+              "title": "resolves share link 4",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unit",
+                  "projectName": "unit",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 2,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-04T15:01:29.622Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "591eb4d23313562f12c7-578010bd2e0537c56f79",
+              "file": "share-links.spec.ts",
+              "line": 5,
+              "column": 9
+            },
+            {
+              "title": "resolves share link 5",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unit",
+                  "projectName": "unit",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-04T15:01:29.628Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "591eb4d23313562f12c7-66a76f346b6aaf01d905",
+              "file": "share-links.spec.ts",
+              "line": 5,
+              "column": 9
+            },
+            {
+              "title": "resolves share link 6",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unit",
+                  "projectName": "unit",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-04T15:01:29.633Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "591eb4d23313562f12c7-409f8eb8a013a0951f2e",
+              "file": "share-links.spec.ts",
+              "line": 5,
+              "column": 9
+            },
+            {
+              "title": "resolves share link 7",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unit",
+                  "projectName": "unit",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-04T15:01:29.641Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "591eb4d23313562f12c7-545fb03146a89672c5f4",
+              "file": "share-links.spec.ts",
+              "line": 5,
+              "column": 9
+            },
+            {
+              "title": "resolves share link 8",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unit",
+                  "projectName": "unit",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-04T15:01:29.646Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "591eb4d23313562f12c7-08a4b398a5545b243d28",
+              "file": "share-links.spec.ts",
+              "line": 5,
+              "column": 9
+            },
+            {
+              "title": "resolves share link 9",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unit",
+                  "projectName": "unit",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 1,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-04T15:01:29.650Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "591eb4d23313562f12c7-01e59f650671278e6532",
+              "file": "share-links.spec.ts",
+              "line": 5,
+              "column": 9
+            },
+            {
+              "title": "resolves share link 10",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unit",
+                  "projectName": "unit",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-04T15:01:29.655Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "591eb4d23313562f12c7-867c2fe74fdd1cee545f",
+              "file": "share-links.spec.ts",
+              "line": 5,
+              "column": 9
+            },
+            {
+              "title": "expires a revoked link",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unit",
+                  "projectName": "unit",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "failed",
+                      "duration": 2,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 1\u001b[39m\n\n\u001b[2m  Object {\u001b[22m\n\u001b[32m-   \"revoked\": false,\u001b[39m\n\u001b[31m+   \"revoked\": true,\u001b[39m\n\u001b[2m  }\u001b[22m",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 1\u001b[39m\n\n\u001b[2m  Object {\u001b[22m\n\u001b[32m-   \"revoked\": false,\u001b[39m\n\u001b[31m+   \"revoked\": true,\u001b[39m\n\u001b[2m  }\u001b[22m\n    at /home/runner/work/gaffer/fixture/tests/share-links.spec.ts:11:31",
+                        "location": {
+                          "file": "/home/runner/work/gaffer/fixture/tests/share-links.spec.ts",
+                          "column": 31,
+                          "line": 11
+                        },
+                        "snippet": "   9 |\n  10 |   test('expires a revoked link', () => {\n> 11 |     expect({ revoked: true }).toEqual({ revoked: false })\n     |                               ^\n  12 |   })\n  13 | })\n  14 |"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/home/runner/work/gaffer/fixture/tests/share-links.spec.ts",
+                            "column": 31,
+                            "line": 11
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 1\u001b[39m\n\n\u001b[2m  Object {\u001b[22m\n\u001b[32m-   \"revoked\": false,\u001b[39m\n\u001b[31m+   \"revoked\": true,\u001b[39m\n\u001b[2m  }\u001b[22m\n\n   9 |\n  10 |   test('expires a revoked link', () => {\n> 11 |     expect({ revoked: true }).toEqual({ revoked: false })\n     |                               ^\n  12 |   })\n  13 | })\n  14 |\n    at /home/runner/work/gaffer/fixture/tests/share-links.spec.ts:11:31"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-04T15:01:29.659Z",
+                      "annotations": [],
+                      "attachments": [],
+                      "errorLocation": {
+                        "file": "/home/runner/work/gaffer/fixture/tests/share-links.spec.ts",
+                        "column": 31,
+                        "line": 11
+                      }
+                    },
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 1,
+                      "status": "failed",
+                      "duration": 4,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 1\u001b[39m\n\n\u001b[2m  Object {\u001b[22m\n\u001b[32m-   \"revoked\": false,\u001b[39m\n\u001b[31m+   \"revoked\": true,\u001b[39m\n\u001b[2m  }\u001b[22m",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 1\u001b[39m\n\n\u001b[2m  Object {\u001b[22m\n\u001b[32m-   \"revoked\": false,\u001b[39m\n\u001b[31m+   \"revoked\": true,\u001b[39m\n\u001b[2m  }\u001b[22m\n    at /home/runner/work/gaffer/fixture/tests/share-links.spec.ts:11:31",
+                        "location": {
+                          "file": "/home/runner/work/gaffer/fixture/tests/share-links.spec.ts",
+                          "column": 31,
+                          "line": 11
+                        },
+                        "snippet": "   9 |\n  10 |   test('expires a revoked link', () => {\n> 11 |     expect({ revoked: true }).toEqual({ revoked: false })\n     |                               ^\n  12 |   })\n  13 | })\n  14 |"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/home/runner/work/gaffer/fixture/tests/share-links.spec.ts",
+                            "column": 31,
+                            "line": 11
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 1\u001b[39m\n\n\u001b[2m  Object {\u001b[22m\n\u001b[32m-   \"revoked\": false,\u001b[39m\n\u001b[31m+   \"revoked\": true,\u001b[39m\n\u001b[2m  }\u001b[22m\n\n   9 |\n  10 |   test('expires a revoked link', () => {\n> 11 |     expect({ revoked: true }).toEqual({ revoked: false })\n     |                               ^\n  12 |   })\n  13 | })\n  14 |\n    at /home/runner/work/gaffer/fixture/tests/share-links.spec.ts:11:31"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 1,
+                      "startTime": "2026-11-04T15:01:29.941Z",
+                      "annotations": [],
+                      "attachments": [],
+                      "errorLocation": {
+                        "file": "/home/runner/work/gaffer/fixture/tests/share-links.spec.ts",
+                        "column": 31,
+                        "line": 11
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "591eb4d23313562f12c7-6985105ba6c9d1e02b80",
+              "file": "share-links.spec.ts",
+              "line": 10,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "upload-sessions.spec.ts",
+      "file": "upload-sessions.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "upload sessions",
+          "file": "upload-sessions.spec.ts",
+          "line": 5,
+          "column": 6,
+          "specs": [
+            {
+              "title": "accepts a 0 byte manifest entry",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unit",
+                  "projectName": "unit",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 2,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-04T15:01:30.220Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "153e278c39e7af627995-a2eabd7d22fb4030d6ed",
+              "file": "upload-sessions.spec.ts",
+              "line": 7,
+              "column": 9
+            },
+            {
+              "title": "accepts a 1 byte manifest entry",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unit",
+                  "projectName": "unit",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 2,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-04T15:01:30.230Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "153e278c39e7af627995-43b4c0fb744cd8331ec8",
+              "file": "upload-sessions.spec.ts",
+              "line": 7,
+              "column": 9
+            },
+            {
+              "title": "accepts a 512 byte manifest entry",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unit",
+                  "projectName": "unit",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-04T15:01:30.237Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "153e278c39e7af627995-6097a68eb5fbb2b2c249",
+              "file": "upload-sessions.spec.ts",
+              "line": 7,
+              "column": 9
+            },
+            {
+              "title": "accepts a 1024 byte manifest entry",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unit",
+                  "projectName": "unit",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 1,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-04T15:01:30.241Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "153e278c39e7af627995-f6722b0f61bc7d2dbd64",
+              "file": "upload-sessions.spec.ts",
+              "line": 7,
+              "column": 9
+            },
+            {
+              "title": "accepts a 10240 byte manifest entry",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unit",
+                  "projectName": "unit",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-04T15:01:30.247Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "153e278c39e7af627995-3489f5479300144053e7",
+              "file": "upload-sessions.spec.ts",
+              "line": 7,
+              "column": 9
+            },
+            {
+              "title": "accepts a 65536 byte manifest entry",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unit",
+                  "projectName": "unit",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-04T15:01:30.251Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "153e278c39e7af627995-fa7fd7290e3ab96be35f",
+              "file": "upload-sessions.spec.ts",
+              "line": 7,
+              "column": 9
+            },
+            {
+              "title": "accepts a 1048576 byte manifest entry",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unit",
+                  "projectName": "unit",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 1,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-04T15:01:30.258Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "153e278c39e7af627995-a3f7e6f12ad9d372719e",
+              "file": "upload-sessions.spec.ts",
+              "line": 7,
+              "column": 9
+            },
+            {
+              "title": "accepts a 10485760 byte manifest entry",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unit",
+                  "projectName": "unit",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-04T15:01:30.263Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "153e278c39e7af627995-7430527bc6cb4fdb98f5",
+              "file": "upload-sessions.spec.ts",
+              "line": 7,
+              "column": 9
+            },
+            {
+              "title": "renders the pending badge",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unit",
+                  "projectName": "unit",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-04T15:01:30.266Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "153e278c39e7af627995-3ae7e07b32fe3d167ac7",
+              "file": "upload-sessions.spec.ts",
+              "line": 13,
+              "column": 9
+            },
+            {
+              "title": "renders the processing badge",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unit",
+                  "projectName": "unit",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-04T15:01:30.271Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "153e278c39e7af627995-01a7ab8e3dd2b9b0d655",
+              "file": "upload-sessions.spec.ts",
+              "line": 13,
+              "column": 9
+            },
+            {
+              "title": "renders the completed badge",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unit",
+                  "projectName": "unit",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-04T15:01:30.274Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "153e278c39e7af627995-12f6c9dd05a93d99af6f",
+              "file": "upload-sessions.spec.ts",
+              "line": 13,
+              "column": 9
+            },
+            {
+              "title": "renders the error badge",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unit",
+                  "projectName": "unit",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-04T15:01:30.277Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "153e278c39e7af627995-f579fe1e357a46bc322c",
+              "file": "upload-sessions.spec.ts",
+              "line": 13,
+              "column": 9
+            },
+            {
+              "title": "renders the timed_out badge",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unit",
+                  "projectName": "unit",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-04T15:01:30.281Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "153e278c39e7af627995-ed8185f187d1e46c22ae",
+              "file": "upload-sessions.spec.ts",
+              "line": 13,
+              "column": 9
+            },
+            {
+              "title": "rejects a negative pending file count",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unit",
+                  "projectName": "unit",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 1,
+                      "status": "failed",
+                      "duration": 1,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: >= \u001b[32m0\u001b[39m\nReceived:    \u001b[31m-1\u001b[39m",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: >= \u001b[32m0\u001b[39m\nReceived:    \u001b[31m-1\u001b[39m\n    at /home/runner/work/gaffer/fixture/tests/upload-sessions.spec.ts:19:16",
+                        "location": {
+                          "file": "/home/runner/work/gaffer/fixture/tests/upload-sessions.spec.ts",
+                          "column": 16,
+                          "line": 19
+                        },
+                        "snippet": "  17 |\n  18 |   test('rejects a negative pending file count', () => {\n> 19 |     expect(-1).toBeGreaterThanOrEqual(0)\n     |                ^\n  20 |   })\n  21 |\n  22 |   test.skip('streams a multipart upload over 5 GB', () => {})"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/home/runner/work/gaffer/fixture/tests/upload-sessions.spec.ts",
+                            "column": 16,
+                            "line": 19
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: >= \u001b[32m0\u001b[39m\nReceived:    \u001b[31m-1\u001b[39m\n\n  17 |\n  18 |   test('rejects a negative pending file count', () => {\n> 19 |     expect(-1).toBeGreaterThanOrEqual(0)\n     |                ^\n  20 |   })\n  21 |\n  22 |   test.skip('streams a multipart upload over 5 GB', () => {})\n    at /home/runner/work/gaffer/fixture/tests/upload-sessions.spec.ts:19:16"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-04T15:01:30.284Z",
+                      "annotations": [],
+                      "attachments": [],
+                      "errorLocation": {
+                        "file": "/home/runner/work/gaffer/fixture/tests/upload-sessions.spec.ts",
+                        "column": 16,
+                        "line": 19
+                      }
+                    },
+                    {
+                      "workerIndex": 5,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 3,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: >= \u001b[32m0\u001b[39m\nReceived:    \u001b[31m-1\u001b[39m",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: >= \u001b[32m0\u001b[39m\nReceived:    \u001b[31m-1\u001b[39m\n    at /home/runner/work/gaffer/fixture/tests/upload-sessions.spec.ts:19:16",
+                        "location": {
+                          "file": "/home/runner/work/gaffer/fixture/tests/upload-sessions.spec.ts",
+                          "column": 16,
+                          "line": 19
+                        },
+                        "snippet": "  17 |\n  18 |   test('rejects a negative pending file count', () => {\n> 19 |     expect(-1).toBeGreaterThanOrEqual(0)\n     |                ^\n  20 |   })\n  21 |\n  22 |   test.skip('streams a multipart upload over 5 GB', () => {})"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/home/runner/work/gaffer/fixture/tests/upload-sessions.spec.ts",
+                            "column": 16,
+                            "line": 19
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: >= \u001b[32m0\u001b[39m\nReceived:    \u001b[31m-1\u001b[39m\n\n  17 |\n  18 |   test('rejects a negative pending file count', () => {\n> 19 |     expect(-1).toBeGreaterThanOrEqual(0)\n     |                ^\n  20 |   })\n  21 |\n  22 |   test.skip('streams a multipart upload over 5 GB', () => {})\n    at /home/runner/work/gaffer/fixture/tests/upload-sessions.spec.ts:19:16"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 1,
+                      "startTime": "2026-11-04T15:01:30.554Z",
+                      "annotations": [],
+                      "attachments": [],
+                      "errorLocation": {
+                        "file": "/home/runner/work/gaffer/fixture/tests/upload-sessions.spec.ts",
+                        "column": 16,
+                        "line": 19
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "153e278c39e7af627995-7d23284bf39e0b6a91ca",
+              "file": "upload-sessions.spec.ts",
+              "line": 18,
+              "column": 7
+            },
+            {
+              "title": "streams a multipart upload over 5 GB",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "location": {
+                        "file": "/home/runner/work/gaffer/fixture/tests/upload-sessions.spec.ts",
+                        "line": 22,
+                        "column": 8
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectId": "unit",
+                  "projectName": "unit",
+                  "results": [
+                    {
+                      "workerIndex": -1,
+                      "parallelIndex": -1,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-04T15:01:30.567Z",
+                      "annotations": [
+                        {
+                          "type": "skip",
+                          "location": {
+                            "file": "/home/runner/work/gaffer/fixture/tests/upload-sessions.spec.ts",
+                            "line": 22,
+                            "column": 8
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "153e278c39e7af627995-6a46a1ee7da1ba3ced71",
+              "file": "upload-sessions.spec.ts",
+              "line": 22,
+              "column": 8
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-11-04T15:01:29.303Z",
+    "duration": 1268.48,
+    "expected": 47,
+    "skipped": 1,
+    "unexpected": 2,
+    "flaky": 1
+  }
+}

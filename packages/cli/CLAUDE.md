@@ -30,41 +30,41 @@ cargo build --release --manifest-path packages/cli/Cargo.toml
 
 ```sh
 # A few representative scenarios — pick whichever maps to the change you're testing
-./packages/cli/target/release/gaffer affected-tests --files packages/gaffer-core/src/affected.rs --format json
-./packages/cli/target/release/gaffer affected-tests --files packages/gaffer-parsers/src/junit.rs --format json
-./packages/cli/target/release/gaffer affected-tests --files packages/cli/src/commands/affected_tests.rs --format json
+./target/release/gaffer affected-tests --files packages/gaffer-core/src/affected.rs --format json
+./target/release/gaffer affected-tests --files packages/gaffer-parsers/src/junit.rs --format json
+./target/release/gaffer affected-tests --files packages/cli/src/commands/affected_tests.rs --format json
 
 # Or pull from a real diff:
 git diff --name-only HEAD~1 \
-  | xargs -I{} ./packages/cli/target/release/gaffer affected-tests --files {} --format json
+  | xargs -I{} ./target/release/gaffer affected-tests --files {} --format json
 ```
 
-### 3. Diff heuristic vs `--graph` strategies
+### 3. Diff heuristic vs graph strategies
 
-The graph layer is opt-in via `--graph` (no cargo feature flag — runtime toggle). Capture before/after on the same input:
+The graph layer is on by default; `--no-graph` turns it off at runtime (no cargo feature flag). Capture before/after on the same input:
 
 ```sh
 # Heuristic only (baseline)
-./target/release/gaffer affected-tests --files <files> --format json > /tmp/baseline.json
+./target/release/gaffer affected-tests --files <files> --format json --no-graph > /tmp/baseline.json
 
 # With the graph layer on
-./target/release/gaffer affected-tests --files <files> --format json --graph > /tmp/with-graph.json
+./target/release/gaffer affected-tests --files <files> --format json > /tmp/with-graph.json
 
 diff /tmp/baseline.json /tmp/with-graph.json
 ```
 
 Baseline outputs for representative scenarios are tracked alongside the integration tests that exercise this monorepo's actual layout. Update them deliberately, with reasoning, when behavior changes.
 
-#### Graph cache (`--graph` default behavior)
+#### Graph cache
 
-When you pass `--graph`, the import graph is persisted to `<project>/.gaffer/graph.db` (SQLite). First call walks the project; subsequent calls re-extract only files whose mtime has changed (~10–50× speedup on a clean working tree).
+The import graph is persisted to `<project>/.gaffer/graph.db` (SQLite). First call walks the project; subsequent calls re-extract only files whose mtime has changed (~10–50× speedup on a clean working tree).
 
 Useful flags for development:
 
 ```sh
 # Force a fresh in-memory build, bypassing the cache. Useful when iterating
 # on the algorithm so stale edges don't pollute results.
-./target/release/gaffer affected-tests --files <files> --graph --no-cache
+./target/release/gaffer affected-tests --files <files> --no-cache
 
 # Reset the cache — delete and let the next call rebuild from scratch.
 rm -rf .gaffer/graph.db
@@ -75,7 +75,7 @@ If the cache fails (corrupt DB, permission denied), the CLI prints a warning to 
 ### 4. Verify the suggested run command actually selects something real
 
 ```sh
-$(./packages/cli/target/release/gaffer affected-tests --files <files> --format json | jq -r .run_command) --reporter=verbose
+$(./target/release/gaffer affected-tests --files <files> --format json | jq -r .run_command) --reporter=verbose
 ```
 
 If the framework can't find the spec, the affected-tests output is wrong regardless of what unit tests say.
@@ -85,7 +85,7 @@ If the framework can't find the spec, the affected-tests output is wrong regardl
 When adding parsers or other large deps, capture:
 
 ```sh
-ls -la packages/cli/target/release/gaffer
+ls -la target/release/gaffer
 ```
 
 …before and after, and include both numbers in the PR description.

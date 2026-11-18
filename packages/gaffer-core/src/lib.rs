@@ -150,6 +150,7 @@ impl GafferCore {
                 return Ok(SyncResult {
                     synced: 0,
                     failed: 0,
+                    dashboard_urls: Vec::new(),
                 });
             }
         };

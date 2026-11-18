@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<testsuites name="vitest tests" tests="3" failures="2" errors="0" time="0.00693325">
+    <testsuite name="tests/entities.test.ts" timestamp="2026-11-11T18:07:06.469Z" hostname="localhost" tests="3" failures="2" errors="0" skipped="0" time="0.00693325">
+        <testcase classname="tests/entities.test.ts" name="plan &lt;tier&gt; &amp; &quot;quota&quot; &gt; it&apos;s &gt; rejects &apos;pro&apos; &gt; &quot;free&quot; &amp; keeps &lt;limits&gt;" time="0.00493425">
+            <failure message="expected { Object (plan, note) } to deeply equal { plan: &apos;free&apos; }" type="AssertionError">
+AssertionError: expected { Object (plan, note) } to deeply equal { plan: &apos;free&apos; }
+
+- Expected
++ Received
+
+  {
+-   &quot;plan&quot;: &quot;free&quot;,
++   &quot;note&quot;: &quot;a &lt; b &amp; \&quot;c\&quot; &gt; d&quot;,
++   &quot;plan&quot;: &quot;pro&quot;,
+  }
+
+ ❯ tests/entities.test.ts:5:54
+            </failure>
+        </testcase>
+        <testcase classname="tests/entities.test.ts" name="plan &lt;tier&gt; &amp; &quot;quota&quot; &gt; it&apos;s &gt; keeps a literal &amp;gt; once" time="0.00114575">
+            <failure message="expected &apos;&amp;gt; literal&apos; to be &apos;&amp;lt; other&apos; // Object.is equality" type="AssertionError">
+AssertionError: expected &apos;&amp;gt; literal&apos; to be &apos;&amp;lt; other&apos; // Object.is equality
+
+Expected: &quot;&amp;lt; other&quot;
+Received: &quot;&amp;gt; literal&quot;
+
+ ❯ tests/entities.test.ts:9:28
+            </failure>
+        </testcase>
+        <testcase classname="tests/entities.test.ts" name="plan &lt;tier&gt; &amp; &quot;quota&quot; &gt; it&apos;s &gt; passes with &amp; in the name" time="0.000223875">
+        </testcase>
+    </testsuite>
+</testsuites>
