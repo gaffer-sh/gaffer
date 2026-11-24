@@ -43,6 +43,7 @@ impl Parser for JestVitestParser {
 
         let mut test_cases: Vec<TestCase> = Vec::new();
         let mut id_counter: usize = 0;
+        let mut file_failures: usize = 0;
 
         for test_result in &report.test_results {
             let file_path = normalize_file_path(&test_result.name);
@@ -84,6 +85,36 @@ impl Parser for JestVitestParser {
                     attachments: Vec::new(),
                 });
             }
+
+            // A file that failed outside its tests (a hook, an import) has no failed test:
+            // record the file itself as the failure, or a red run reads as green (GAF-600).
+            if test_result.status == "failed"
+                && !test_result.assertion_results.iter().any(|a| a.status == "failed")
+            {
+                id_counter += 1;
+                file_failures += 1;
+                let error_message = if test_result.message.is_empty() {
+                    "Test file failed outside its tests (for example in a beforeAll hook). The JSON report does not include the error.".to_string()
+                } else {
+                    test_result.message.clone()
+                };
+                test_cases.push(TestCase {
+                    id: format!("tc-{}", id_counter),
+                    name: file_path.clone(),
+                    full_name: file_path.clone(),
+                    suite: None,
+                    status: TestStatus::Failed,
+                    duration_ms: None,
+                    error_message: Some(error_message),
+                    file_path: Some(file_path.clone()),
+                    line: None,
+                    error_stack: None,
+                    retry_attempt: None,
+                    started_at: None,
+                    worker_index: None,
+                    attachments: Vec::new(),
+                });
+            }
         }
 
         // Duration: sum of (endTime - startTime) across testResults
@@ -103,10 +134,10 @@ impl Parser for JestVitestParser {
 
         let summary = Summary {
             passed: report.num_passed_tests,
-            failed: report.num_failed_tests,
+            failed: report.num_failed_tests + file_failures,
             skipped: report.num_pending_tests + report.num_todo_tests,
             flaky: 0,
-            total: report.num_total_tests,
+            total: report.num_total_tests + file_failures,
             duration_ms,
         };
 
@@ -219,6 +250,10 @@ struct JestVitestReport {
 #[serde(rename_all = "camelCase")]
 struct TestResult {
     assertion_results: Vec<AssertionResult>,
+    #[serde(default)]
+    status: String,
+    #[serde(default)]
+    message: String,
     end_time: f64,
     start_time: f64,
     name: String,

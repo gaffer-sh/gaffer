@@ -648,3 +648,14 @@ fn test_suite_name_path_uses_forward_slashes_and_rejects_non_paths() {
     assert_eq!(file_path("my suite.ts"), None);
     assert_eq!(file_path(".ts"), None);
 }
+
+// GAF-600: real Vitest 4.1.12 `--reporter=junit` output with setup failures. Vitest writes each
+// failed suite or file as its own <testcase> with a <failure>, so JUnit already carries them.
+#[test]
+fn test_vitest_junit_setup_failures_are_failures() {
+    let report = parse_and_check(&load_fixture("vitest-junit-setup-failures.xml"));
+    assert_eq!(report["summary"]["failed"], 3);
+    let hook = find_test(&report, "mutation state");
+    assert_eq!(hook["status"], "failed");
+    assert_eq!(hook["errorMessage"], "database not ready");
+}

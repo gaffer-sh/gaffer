@@ -714,3 +714,51 @@ fn test_path_normalization_no_marker() {
     // No marker found → fallback to filename
     assert_eq!(report["data"]["testCases"][0]["filePath"], "my-file.spec.ts");
 }
+
+// ============================================================================
+// vitest-setup-failures.json (GAF-600): real Vitest 4.1.12 `--reporter=json`
+// output. A describe-level beforeAll throws, a file-level beforeAll times out,
+// a file fails to import. Vitest marks their tests skipped and counts no
+// failed test, so each failed file must be recorded as a failure itself.
+// ============================================================================
+
+#[test]
+fn test_vitest_setup_failures_count_as_failures() {
+    let report = parse_via_registry(&load_fixture("vitest-setup-failures.json"), "results.json");
+    let summary = &report["data"]["summary"];
+    assert_eq!(summary["failed"], 3);
+    assert_eq!(summary["passed"], 1);
+    assert_eq!(summary["skipped"], 4);
+    assert_eq!(summary["total"], 8);
+}
+
+#[test]
+fn test_vitest_setup_failure_carries_the_file_error() {
+    let report = parse_via_registry(&load_fixture("vitest-setup-failures.json"), "results.json");
+    let failed: Vec<&serde_json::Value> = report["data"]["testCases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|tc| tc["status"] == "failed")
+        .collect();
+    let by_file = |path: &str| failed.iter().find(|tc| tc["filePath"] == path).unwrap();
+
+    let hook = by_file("tests/file-hook.test.ts");
+    assert!(hook["errorMessage"].as_str().unwrap().starts_with("Hook timed out in 50ms"));
+    let import = by_file("tests/import-error.test.ts");
+    assert!(import["errorMessage"].as_str().unwrap().contains("Cannot find module './does-not-exist'"));
+    // The JSON reporter drops a describe-level hook error, so only the failure itself is known.
+    assert!(by_file("tests/describe-hook.test.ts")["errorMessage"].is_string());
+}
+
+#[test]
+fn test_failed_file_with_a_failed_test_adds_no_extra_failure() {
+    let report = parse_via_registry(&load_fixture("vitest-report.json"), "vitest-results.json");
+    let failed = report["data"]["testCases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|tc| tc["status"] == "failed")
+        .count();
+    assert_eq!(failed, report["data"]["summary"]["failed"].as_u64().unwrap() as usize);
+}

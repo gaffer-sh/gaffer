@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<testsuites name="vitest tests" tests="8" failures="3" errors="0" time="0.058497375">
+    <testsuite name="tests/describe-hook.test.ts" timestamp="2026-11-24T00:06:11.407Z" hostname="runner" tests="3" failures="1" errors="0" skipped="2" time="0.00133875">
+        <testcase classname="tests/describe-hook.test.ts" name="mutation state &gt; records a mutation" time="0">
+            <skipped/>
+        </testcase>
+        <testcase classname="tests/describe-hook.test.ts" name="mutation state &gt; updates a mutation" time="0">
+            <skipped/>
+        </testcase>
+        <testcase classname="tests/describe-hook.test.ts" name="mutation state" time="0.000885">
+            <failure message="database not ready" type="Error">
+Error: database not ready
+ ❯ tests/describe-hook.test.ts:5:11
+            </failure>
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/file-hook.test.ts" timestamp="2026-11-24T00:06:11.434Z" hostname="runner" tests="2" failures="1" errors="0" skipped="1" time="0.054182208">
+        <testcase classname="tests/file-hook.test.ts" name="reads state" time="0">
+            <skipped/>
+        </testcase>
+        <testcase classname="tests/file-hook.test.ts" name="tests/file-hook.test.ts" time="0.054182208">
+            <failure message="Hook timed out in 50ms.
+If this is a long-running hook, pass a timeout value as the last argument or configure it globally with &quot;hookTimeout&quot;." type="Error">
+Error: Hook timed out in 50ms.
+If this is a long-running hook, pass a timeout value as the last argument or configure it globally with &quot;hookTimeout&quot;.
+ ❯ tests/file-hook.test.ts:3:1
+            </failure>
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/import-error.test.ts" timestamp="2026-11-24T00:06:11.439Z" hostname="runner" tests="1" failures="1" errors="0" skipped="0" time="0">
+        <testcase classname="tests/import-error.test.ts" name="tests/import-error.test.ts" time="0">
+            <failure message="Cannot find module &apos;./does-not-exist&apos; imported from /private/tmp/vitest-setup-fixture/tests/import-error.test.ts" type="Error">
+Error: Cannot find module &apos;./does-not-exist&apos; imported from /private/tmp/vitest-setup-fixture/tests/import-error.test.ts
+ ❯ tests/import-error.test.ts:2:1
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: &apos;ERR_MODULE_NOT_FOUND&apos; }
+            </failure>
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/ok.test.ts" timestamp="2026-11-24T00:06:11.446Z" hostname="runner" tests="2" failures="0" errors="0" skipped="1" time="0.002976417">
+        <testcase classname="tests/ok.test.ts" name="ok &gt; passes" time="0.001565916">
+        </testcase>
+        <testcase classname="tests/ok.test.ts" name="ok &gt; is skipped" time="0">
+            <skipped/>
+        </testcase>
+    </testsuite>
+</testsuites>
