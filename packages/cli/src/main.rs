@@ -72,7 +72,7 @@ struct Cli {
 enum Commands {
     /// Run a test command and analyze results
     Test {
-        /// Authentication token (overrides GAFFER_TOKEN env var and config files).
+        /// Authentication token (overrides GAFFER_PROJECT_TOKEN env var and config files).
         /// On GitHub Actions with no token configured, falls back to exchanging
         /// the runner's OIDC identity token (grant `permissions: id-token: write`).
         #[arg(long)]
@@ -153,12 +153,12 @@ enum Commands {
 
     /// Upload test reports or artifacts directly to the Gaffer dashboard.
     ///
-    /// Routes small bundles (no file >90 MB AND total <200 MB) to a single
-    /// multipart POST, and large files individually through R2 multipart
-    /// upload (8-way concurrent part PUTs, automatic retry on 5xx/network).
+    /// Sends files in multipart POSTs of up to 40 MiB each, and any file over
+    /// 40 MiB through R2 multipart upload (8-way concurrent part PUTs,
+    /// automatic retry on 5xx/network), all into one upload session.
     ///
     /// Limits: per-file ceiling is 5 GB (raise --max-file-size-mb to 5000).
-    /// Multipart elevation above 90 MB is automatic — no extra flag needed.
+    /// Multipart elevation above 40 MiB is automatic — no extra flag needed.
     ///
     /// Auth: on GitHub Actions with no --token / GAFFER_PROJECT_TOKEN configured,
     /// falls back to exchanging the runner's OIDC identity token for a project
@@ -213,7 +213,7 @@ enum Commands {
 
     /// Force sync pending uploads to the Gaffer dashboard
     Sync {
-        /// Authentication token (overrides GAFFER_TOKEN env var and config files)
+        /// Authentication token (overrides GAFFER_PROJECT_TOKEN env var and config files)
         #[arg(long)]
         token: Option<String>,
 
@@ -228,6 +228,14 @@ enum Commands {
         /// Directory for local data storage (default: current directory)
         #[arg(long)]
         data_dir: Option<PathBuf>,
+
+        /// Give uploads that ran out of retries a fresh set, then sync (see `gaffer doctor`)
+        #[arg(long, conflicts_with = "purge_exhausted")]
+        retry_exhausted: bool,
+
+        /// Drop uploads that ran out of retries without sending them; local runs are kept
+        #[arg(long)]
+        purge_exhausted: bool,
     },
 
     /// Authenticate this machine and store the credential in the global config.
@@ -307,7 +315,7 @@ enum Commands {
 
     /// Diagnose common setup issues
     Doctor {
-        /// Authentication token (overrides GAFFER_TOKEN env var and config files)
+        /// Authentication token (overrides GAFFER_PROJECT_TOKEN env var and config files)
         #[arg(long)]
         token: Option<String>,
 
@@ -519,6 +527,8 @@ fn main() {
             api_url,
             config,
             data_dir,
+            retry_exhausted,
+            purge_exhausted,
         } => {
             let project_root = resolve_data_dir(data_dir.as_ref());
             let config = Config::resolve(
@@ -528,7 +538,7 @@ fn main() {
                 &project_root,
                 config.as_deref(),
             );
-            if let Err(e) = commands::sync::run(&config) {
+            if let Err(e) = commands::sync::run(&config, retry_exhausted, purge_exhausted) {
                 eprintln!("[gaffer] Error: {:#}", e);
                 process::exit(1);
             }

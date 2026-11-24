@@ -315,66 +315,71 @@ fn authenticate_legacy(api_base: &str) -> Result<String> {
     loop {
         if start.elapsed() > SESSION_TIMEOUT {
             anyhow::bail!(
-                "Authentication timed out. You can copy your token from {}/settings and set GAFFER_TOKEN.",
+                "Authentication timed out. You can copy your token from {}/settings and set GAFFER_PROJECT_TOKEN.",
                 api_base
             );
         }
 
         thread::sleep(SESSION_POLL_INTERVAL);
 
-        let body: serde_json::Value = match ureq::get(&poll_url).call() {
-            Ok(resp) => {
-                consecutive_errors = 0;
-                match serde_json::from_reader(resp.into_body().as_reader()) {
-                    Ok(v) => v,
-                    Err(e) => {
-                        eprintln!(
-                            "  {} Unexpected response from server: {}",
-                            "Warning:".yellow().bold(),
-                            e
-                        );
-                        continue;
-                    }
-                }
-            }
-            Err(ureq::Error::StatusCode(status)) => {
-                if status == 404 {
-                    anyhow::bail!(
-                        "Session expired or not found. Please re-run `gaffer init`."
-                    );
-                }
-                if status == 429 {
-                    thread::sleep(Duration::from_secs(5));
-                    continue;
-                }
-                consecutive_errors += 1;
-                if consecutive_errors >= MAX_CONSECUTIVE_ERRORS {
-                    anyhow::bail!(
-                        "Server returned HTTP {} after {} consecutive failures. Check your network and try again.",
-                        status, consecutive_errors
-                    );
-                }
-                continue;
-            }
-            Err(e) => {
-                consecutive_errors += 1;
-                if consecutive_errors >= MAX_CONSECUTIVE_ERRORS {
-                    anyhow::bail!(
-                        "Cannot reach Gaffer server after {} attempts: {}. Check your network and try again.",
-                        consecutive_errors, e
-                    );
-                }
-                continue;
-            }
-        };
-
-        if body["status"].as_str() == Some("ready") {
-            if let Some(token) = body["token"].as_str() {
+        match poll_session_once(&poll_url) {
+            SessionPoll::Ready(token) => {
                 println!("  {} Authenticated!", "Done:".green().bold());
-                return Ok(token.to_string());
+                return Ok(token);
+            }
+            SessionPoll::Pending => consecutive_errors = 0,
+            SessionPoll::RateLimited => thread::sleep(Duration::from_secs(5)),
+            SessionPoll::Terminal(detail) => anyhow::bail!("{detail}"),
+            SessionPoll::Transient(detail) => {
+                consecutive_errors += 1;
+                if consecutive_errors >= MAX_CONSECUTIVE_ERRORS {
+                    anyhow::bail!(
+                        "Gave up after {} consecutive failures: {}. Check your network and try again.",
+                        consecutive_errors, detail
+                    );
+                }
             }
         }
-        // status == "pending" → keep polling
+    }
+}
+
+/// One poll of the legacy session endpoint, before it becomes a loop decision.
+/// Mirrors `login::PollOutcome`: a status the CLI does not know ends the wait.
+#[derive(Debug, PartialEq)]
+enum SessionPoll {
+    Ready(String),
+    Pending,
+    RateLimited,
+    Terminal(String),
+    Transient(String),
+}
+
+fn poll_session_once(poll_url: &str) -> SessionPoll {
+    let body: serde_json::Value = match ureq::get(poll_url).call() {
+        Ok(resp) => match serde_json::from_reader(resp.into_body().as_reader()) {
+            Ok(v) => v,
+            Err(e) => return SessionPoll::Transient(format!("unexpected response from server: {e}")),
+        },
+        Err(ureq::Error::StatusCode(404)) => {
+            return SessionPoll::Terminal(
+                "Session expired or not found. Please re-run `gaffer init`.".to_string(),
+            )
+        }
+        Err(ureq::Error::StatusCode(429)) => return SessionPoll::RateLimited,
+        Err(ureq::Error::StatusCode(status)) => return SessionPoll::Transient(format!("HTTP {status}")),
+        Err(e) => return SessionPoll::Transient(e.to_string()),
+    };
+
+    match (body["status"].as_str(), body["token"].as_str()) {
+        (Some("ready"), Some(token)) => SessionPoll::Ready(token.to_string()),
+        (Some("pending"), _) => SessionPoll::Pending,
+        (Some("ready"), None) => {
+            SessionPoll::Terminal("The server reported the session ready but sent no token.".to_string())
+        }
+        (status, _) => SessionPoll::Terminal(format!(
+            "Unexpected session status {}. Please re-run `gaffer init`.",
+            status.map_or_else(|| "(none)".to_string(), |s| format!("\"{s}\""))
+        )),
     }
 }
 
@@ -419,5 +424,52 @@ fn ensure_gitignore(project_root: &Path) {
             "Warning:".yellow().bold(),
             e
         ),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::http_mock::mock_once;
+
+    fn poll(status_line: &'static str, body: &str) -> SessionPoll {
+        let base = mock_once(status_line, body.to_string());
+        poll_session_once(&format!("{base}/api/v1/cli/token?code=abc"))
+    }
+
+    #[test]
+    fn ready_with_a_token_is_ready() {
+        assert_eq!(
+            poll("HTTP/1.1 200 OK", r#"{"status":"ready","token":"gfr_1"}"#),
+            SessionPoll::Ready("gfr_1".to_string())
+        );
+    }
+
+    #[test]
+    fn pending_keeps_polling() {
+        assert_eq!(poll("HTTP/1.1 200 OK", r#"{"status":"pending"}"#), SessionPoll::Pending);
+    }
+
+    #[test]
+    fn an_unknown_status_ends_the_wait() {
+        let outcome = poll("HTTP/1.1 200 OK", r#"{"status":"expired"}"#);
+        assert!(matches!(&outcome, SessionPoll::Terminal(d) if d.contains("\"expired\"")), "{outcome:?}");
+    }
+
+    #[test]
+    fn ready_without_a_token_ends_the_wait() {
+        assert!(matches!(poll("HTTP/1.1 200 OK", r#"{"status":"ready"}"#), SessionPoll::Terminal(_)));
+    }
+
+    #[test]
+    fn a_missing_session_ends_the_wait() {
+        assert!(matches!(poll("HTTP/1.1 404 Not Found", "{}"), SessionPoll::Terminal(_)));
+    }
+
+    #[test]
+    fn rate_limits_and_server_errors_are_retried() {
+        assert_eq!(poll("HTTP/1.1 429 Too Many Requests", "{}"), SessionPoll::RateLimited);
+        assert!(matches!(poll("HTTP/1.1 503 Service Unavailable", "{}"), SessionPoll::Transient(_)));
+        assert!(matches!(poll("HTTP/1.1 200 OK", "not json"), SessionPoll::Transient(_)));
     }
 }

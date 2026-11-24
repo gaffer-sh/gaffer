@@ -21,8 +21,8 @@ use rusqlite::{params, Connection};
 use std::path::Path;
 
 use crate::types::{
-    CoverageSummary, FailureSearchResult, PendingUpload, RecentRun, RunMetadata, RunSummary,
-    TestEvent, TestHistoryEntry,
+    CoverageSummary, ExhaustedUpload, FailureSearchResult, PendingUpload, RecentRun, RunMetadata, RunStatus,
+    RunSummary, TestEvent, TestHistoryEntry,
 };
 
 // Internal types for intelligence queries — these don't cross the NAPI boundary.
@@ -50,6 +50,11 @@ pub struct FailedTest {
 const MIGRATION_001: &str = include_str!("migrations/001_init.sql");
 const MIGRATION_002: &str = include_str!("migrations/002_coverage_columns.sql");
 const MIGRATION_003: &str = include_str!("migrations/003_test_identity.sql");
+const MIGRATION_004: &str = include_str!("migrations/004_run_status_check.sql");
+
+/// How long a connection waits on another `gaffer` process's write lock before
+/// returning SQLITE_BUSY (two `gaffer test` runs in one checkout).
+const BUSY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 
 /// Escape SQL LIKE wildcards (`%`, `_`, `\`) in user input so they are matched literally.
 fn escape_like(input: &str) -> String {
@@ -83,6 +88,7 @@ impl Database {
         }
 
         let conn = Connection::open(db_path)?;
+        conn.busy_timeout(BUSY_TIMEOUT)?;
 
         // WAL mode allows concurrent readers (future: MCP server) + single writer (reporter)
         conn.pragma_update(None, "journal_mode", "WAL")?;
@@ -122,6 +128,9 @@ impl Database {
         if version < 3 {
             self.apply_additive_migration(MIGRATION_003)?;
         }
+        if version < 4 {
+            self.rebuild_test_runs(MIGRATION_004)?;
+        }
 
         Ok(())
     }
@@ -147,6 +156,20 @@ impl Database {
         Ok(())
     }
 
+    /// Run a migration that rebuilds `test_runs`, in one transaction with foreign keys
+    /// off: otherwise its `DROP TABLE` cascade-deletes every child row. The pragma is a
+    /// no-op inside a transaction, so it is toggled around it.
+    fn rebuild_test_runs(&self, migration: &str) -> Result<(), rusqlite::Error> {
+        self.conn.pragma_update(None, "foreign_keys", "OFF")?;
+        let result = rusqlite::Transaction::new_unchecked(&self.conn, rusqlite::TransactionBehavior::Immediate)
+            .and_then(|tx| {
+                tx.execute_batch(migration)?;
+                tx.commit()
+            });
+        self.conn.pragma_update(None, "foreign_keys", "ON")?;
+        result
+    }
+
     /// Insert a new test run in "running" state. Called by GafferCore::start_run.
     pub fn insert_run(
         &self,
@@ -156,7 +179,7 @@ impl Database {
     ) -> Result<(), rusqlite::Error> {
         self.conn.execute(
             "INSERT INTO test_runs (id, branch, commit_sha, ci_provider, framework, started_at, status)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'running')",
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             params![
                 run_id,
                 metadata.branch,
@@ -164,6 +187,7 @@ impl Database {
                 metadata.ci_provider,
                 metadata.framework,
                 started_at,
+                RunStatus::Running.as_str(),
             ],
         )?;
         Ok(())
@@ -201,14 +225,14 @@ impl Database {
     ) -> Result<(), rusqlite::Error> {
         let rows_affected = self.conn.execute(
             "UPDATE test_runs SET
-                status = 'finished',
+                status = ?8,
                 total = ?2,
                 passed = ?3,
                 failed = ?4,
                 skipped = ?5,
                 duration_ms = ?6,
                 finished_at = ?7
-             WHERE id = ?1 AND status = 'running'",
+             WHERE id = ?1 AND status = ?9",
             params![
                 run_id,
                 summary.total,
@@ -217,12 +241,33 @@ impl Database {
                 summary.skipped,
                 summary.duration,
                 finished_at,
+                RunStatus::Finished.as_str(),
+                RunStatus::Running.as_str(),
             ],
         )?;
         if rows_affected == 0 {
             return Err(rusqlite::Error::QueryReturnedNoRows);
         }
         Ok(())
+    }
+
+    /// End a still-running run as `Failed` (the command never ran, or finalizing broke).
+    /// A run that already ended keeps its status, so this is safe on any error path.
+    pub fn fail_run(&self, run_id: &str, finished_at: &str) -> Result<(), rusqlite::Error> {
+        self.conn.execute(
+            "UPDATE test_runs SET status = ?2, finished_at = ?3 WHERE id = ?1 AND status = ?4",
+            params![run_id, RunStatus::Failed.as_str(), finished_at, RunStatus::Running.as_str()],
+        )?;
+        Ok(())
+    }
+
+    /// Mark runs still `Running` that started before `cutoff` (RFC 3339) as `Interrupted`:
+    /// their `gaffer` process was killed before it could end them. Returns how many.
+    pub fn interrupt_stale_runs(&self, cutoff: &str) -> Result<usize, rusqlite::Error> {
+        self.conn.execute(
+            "UPDATE test_runs SET status = ?2 WHERE status = ?3 AND started_at < ?1",
+            params![cutoff, RunStatus::Interrupted.as_str(), RunStatus::Running.as_str()],
+        )
     }
 
     /// Update the framework field for a run (detected from parsed reports).
@@ -264,6 +309,14 @@ impl Database {
         self.conn.query_row(
             "SELECT COUNT(*) FROM test_executions WHERE run_id = ?1 AND status = ?2",
             params![run_id, status],
+            |row| row.get(0),
+        )
+    }
+
+    pub fn get_run_count_by_status(&self, status: RunStatus) -> Result<i64, rusqlite::Error> {
+        self.conn.query_row(
+            "SELECT COUNT(*) FROM test_runs WHERE status = ?1",
+            params![status.as_str()],
             |row| row.get(0),
         )
     }
@@ -504,6 +557,42 @@ impl Database {
             params![run_id],
         )?;
         tx.commit()
+    }
+
+    /// Uploads at or past `max_attempts`, which `get_pending_uploads` skips.
+    pub fn get_exhausted_uploads(
+        &self,
+        max_attempts: i32,
+    ) -> Result<Vec<ExhaustedUpload>, rusqlite::Error> {
+        let mut stmt = self.conn.prepare(
+            "SELECT run_id, attempts, last_error FROM pending_uploads
+             WHERE attempts >= ?1
+             ORDER BY created_at ASC",
+        )?;
+        let rows = stmt.query_map(params![max_attempts], |row| {
+            Ok(ExhaustedUpload {
+                run_id: row.get(0)?,
+                attempts: row.get(1)?,
+                last_error: row.get(2)?,
+            })
+        })?;
+        rows.collect()
+    }
+
+    /// Reset exhausted uploads to zero attempts so the next sync sends them again.
+    pub fn reset_exhausted_uploads(&self, max_attempts: i32) -> Result<usize, rusqlite::Error> {
+        self.conn.execute(
+            "UPDATE pending_uploads SET attempts = 0 WHERE attempts >= ?1",
+            params![max_attempts],
+        )
+    }
+
+    /// Delete exhausted uploads. The runs stay in local history.
+    pub fn purge_exhausted_uploads(&self, max_attempts: i32) -> Result<usize, rusqlite::Error> {
+        self.conn.execute(
+            "DELETE FROM pending_uploads WHERE attempts >= ?1",
+            params![max_attempts],
+        )
     }
 
     /// Record a sync failure: increment attempts and store the error message.
@@ -927,7 +1016,7 @@ mod tests {
                 .execute_batch(
                     "ALTER TABLE test_executions DROP COLUMN suite;
                      ALTER TABLE test_executions DROP COLUMN line;
-                     DELETE FROM schema_version WHERE version = 3;",
+                     DELETE FROM schema_version WHERE version >= 3;",
                 )
                 .unwrap();
         }
@@ -938,6 +1027,110 @@ mod tests {
         assert_eq!(stored[0].name, "old");
         assert_eq!(stored[0].suite, None);
         assert_eq!(stored[0].line, None);
+    }
+
+    fn test_runs_columns(db: &Database) -> Vec<String> {
+        let mut stmt = db.conn.prepare("SELECT name FROM pragma_table_info('test_runs')").unwrap();
+        stmt.query_map([], |r| r.get(0)).unwrap().map(Result::unwrap).collect()
+    }
+
+    #[test]
+    fn migration_004_upgrades_a_version_3_database_and_keeps_its_rows() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("data.db");
+        let v3_columns = {
+            // A real v3 database: 001, then 002 and 003 through the runner, as open() did before 004.
+            let conn = Connection::open(&path).unwrap();
+            conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+            conn.execute_batch(MIGRATION_001).unwrap();
+            let v3 = Database { conn };
+            v3.apply_additive_migration(MIGRATION_002).unwrap();
+            v3.apply_additive_migration(MIGRATION_003).unwrap();
+            v3.conn.execute_batch(
+                "INSERT INTO test_runs (id, framework, started_at, status, total)
+                     VALUES ('done', 'vitest', '2026-02-22T10:00:00Z', 'finished', 1);
+                 INSERT INTO test_runs (id, framework, started_at, status)
+                     VALUES ('stuck', 'cli', '2026-02-22T11:00:00Z', 'running');
+                 INSERT INTO test_executions (run_id, name, status, duration_ms)
+                     VALUES ('done', 'kept', 'passed', 1.0);
+                 INSERT INTO pending_uploads (run_id, payload) VALUES ('done', '{}');",
+            )
+            .unwrap();
+            test_runs_columns(&v3)
+        };
+
+        let db = Database::open(&path).unwrap();
+
+        // The rebuild's hardcoded column list must keep every v3 column.
+        assert_eq!(test_runs_columns(&db), v3_columns);
+
+        assert_eq!(get_run_row(&db, "done").0, "finished");
+        assert_eq!(get_run_row(&db, "stuck").0, "running");
+        // The table rebuild must not cascade-delete child rows.
+        assert_eq!(db.get_test_executions_for_run("done").unwrap()[0].name, "kept");
+        assert_eq!(db.get_pending_uploads(5).unwrap().len(), 1);
+        let version: i32 = db
+            .conn
+            .query_row("SELECT MAX(version) FROM schema_version", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(version, 4);
+        // Foreign keys are back on, so deleting a run still cascades.
+        db.conn.execute("DELETE FROM test_runs WHERE id = 'done'", []).unwrap();
+        assert_eq!(db.get_test_count("done").unwrap(), 0);
+    }
+
+    #[test]
+    fn run_status_check_accepts_every_run_status_and_rejects_others() {
+        let (db, _dir) = test_db();
+        db.insert_run("run-1", &sample_metadata(), "2026-02-22T10:00:00Z").unwrap();
+        let set_status = |s: &str| {
+            db.conn.execute("UPDATE test_runs SET status = ?1 WHERE id = 'run-1'", params![s])
+        };
+
+        for status in [RunStatus::Running, RunStatus::Finished, RunStatus::Failed, RunStatus::Interrupted] {
+            set_status(status.as_str()).unwrap();
+        }
+        assert!(set_status("done").is_err());
+    }
+
+    #[test]
+    fn open_sets_a_busy_timeout() {
+        let (db, _dir) = test_db();
+        let ms: i64 = db.conn.query_row("PRAGMA busy_timeout", [], |r| r.get(0)).unwrap();
+        assert_eq!(ms, BUSY_TIMEOUT.as_millis() as i64);
+    }
+
+    #[test]
+    fn fail_run_ends_a_running_run_and_leaves_a_finished_one() {
+        let (db, _dir) = test_db();
+        db.insert_run("running", &sample_metadata(), "2026-02-22T10:00:00Z").unwrap();
+        db.insert_run("done", &sample_metadata(), "2026-02-22T10:00:00Z").unwrap();
+        let summary = RunSummary { total: 0, passed: 0, failed: 0, skipped: 0, duration: 1.0 };
+        db.finish_run("done", &summary, "2026-02-22T10:01:00Z").unwrap();
+
+        db.fail_run("running", "2026-02-22T10:02:00Z").unwrap();
+        db.fail_run("done", "2026-02-22T10:02:00Z").unwrap();
+
+        let failed = get_run_row(&db, "running");
+        assert_eq!(failed.0, "failed");
+        assert_eq!(failed.6.as_deref(), Some("2026-02-22T10:02:00Z"));
+        assert_eq!(get_run_row(&db, "done").0, "finished");
+    }
+
+    #[test]
+    fn interrupt_stale_runs_marks_only_old_running_runs() {
+        let (db, _dir) = test_db();
+        db.insert_run("old", &sample_metadata(), "2026-02-20T10:00:00+00:00").unwrap();
+        db.insert_run("live", &sample_metadata(), "2026-02-22T10:00:00+00:00").unwrap();
+        db.insert_run("old-failed", &sample_metadata(), "2026-02-20T10:00:00+00:00").unwrap();
+        db.fail_run("old-failed", "2026-02-20T10:00:01+00:00").unwrap();
+
+        let marked = db.interrupt_stale_runs("2026-02-21T10:00:00+00:00").unwrap();
+
+        assert_eq!(marked, 1);
+        assert_eq!(get_run_row(&db, "old").0, "interrupted");
+        assert_eq!(get_run_row(&db, "live").0, "running");
+        assert_eq!(get_run_row(&db, "old-failed").0, "failed");
     }
 
     #[test]
@@ -1513,6 +1706,54 @@ mod tests {
         }
         let pending = db.get_pending_uploads(5).unwrap();
         assert!(pending.is_empty());
+    }
+
+    fn exhausted_upload(db: &Database, run_id: &str) {
+        db.insert_run(run_id, &sample_metadata(), "2026-02-22T10:00:00Z").unwrap();
+        let upload_id = db.insert_pending_upload(run_id, "{}").unwrap();
+        for attempt in 1..=5 {
+            db.record_sync_failure(upload_id, &format!("HTTP 500 (attempt {attempt})")).unwrap();
+        }
+    }
+
+    #[test]
+    fn exhausted_uploads_are_listed_with_their_last_error() {
+        let (db, _dir) = test_db();
+        exhausted_upload(&db, "run-1");
+        db.insert_run("run-2", &sample_metadata(), "2026-02-22T10:00:00Z").unwrap();
+        db.insert_pending_upload("run-2", "{}").unwrap();
+
+        let exhausted = db.get_exhausted_uploads(5).unwrap();
+
+        assert_eq!(exhausted.len(), 1);
+        assert_eq!(exhausted[0].run_id, "run-1");
+        assert_eq!(exhausted[0].attempts, 5);
+        assert_eq!(exhausted[0].last_error.as_deref(), Some("HTTP 500 (attempt 5)"));
+    }
+
+    #[test]
+    fn resetting_exhausted_uploads_queues_them_again() {
+        let (db, _dir) = test_db();
+        exhausted_upload(&db, "run-1");
+
+        assert_eq!(db.reset_exhausted_uploads(5).unwrap(), 1);
+
+        assert!(db.get_exhausted_uploads(5).unwrap().is_empty());
+        assert_eq!(db.get_pending_uploads(5).unwrap()[0].run_id, "run-1");
+    }
+
+    #[test]
+    fn purging_exhausted_uploads_keeps_live_uploads_and_the_run() {
+        let (db, _dir) = test_db();
+        exhausted_upload(&db, "run-1");
+        db.insert_run("run-2", &sample_metadata(), "2026-02-22T10:00:00Z").unwrap();
+        db.insert_pending_upload("run-2", "{}").unwrap();
+
+        assert_eq!(db.purge_exhausted_uploads(5).unwrap(), 1);
+
+        assert!(db.get_exhausted_uploads(5).unwrap().is_empty());
+        assert_eq!(db.get_pending_uploads(5).unwrap()[0].run_id, "run-2");
+        assert!(db.get_run_started_at("run-1").is_ok());
     }
 
     // -----------------------------------------------------------------------

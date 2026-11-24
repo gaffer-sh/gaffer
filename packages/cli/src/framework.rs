@@ -352,15 +352,17 @@ fn pytest_instructions(config: &PytestConfig) -> String {
 fn jest_instructions(config_path: &Path) -> String {
     let filename = config_path.file_name().unwrap_or_default().to_string_lossy();
     format!(
-        "Jest requires a reporter package for structured output.\n\n\
-         Option 1 — JUnit:\n\
+        "Jest needs a report file for structured output.\n\n\
+         Option 1 — built-in JSON reporter (no install):\n\
+         {sp}gaffer test -- npx jest --json --outputFile=jest-results.json\n\n\
+         Option 2 — JUnit:\n\
          {sp}1. Install: pnpm add -D jest-junit\n\
          {sp}2. Add to {filename} (or package.json):\n\n\
          {sp}{sp}reporters: ['default', ['jest-junit', {{\n\
          {sp}{sp}{sp}outputDirectory: '.gaffer/reports',\n\
          {sp}{sp}{sp}outputName: 'junit.xml',\n\
          {sp}{sp}}}]],\n\n\
-         Option 2 — CTRF:\n\
+         Option 3 — CTRF:\n\
          {sp}1. Install: pnpm add -D jest-ctrf-json-reporter\n\
          {sp}2. Add to {filename} (or package.json):\n\n\
          {sp}{sp}reporters: ['default', ['jest-ctrf-json-reporter', {{\n\
@@ -666,7 +668,9 @@ mod tests {
         let config = dir.path().join("jest.config.js");
         fs::write(&config, "module.exports = {}").unwrap();
         let result = check_reporter(&Framework::Jest(config));
-        assert!(matches!(result, PatchResult::Instructions(_)));
+        let PatchResult::Instructions(text) = result else { panic!("expected instructions") };
+        let json = text.find("--json --outputFile").expect("names the built-in JSON reporter");
+        assert!(json < text.find("jest-junit").unwrap(), "JSON reporter comes first");
     }
 
     #[test]

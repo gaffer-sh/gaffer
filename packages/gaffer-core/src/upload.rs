@@ -52,7 +52,7 @@ pub fn dashboard_session_url(api_url: Option<&str>, project_id: &str, session_id
 /// `tests/v1_ceiling_parity.rs` here, and `cli-upload-ceiling-parity.spec.ts`
 /// in the dashboard. Editing one constant without the other fails whichever
 /// suite the editor was already running.
-pub const V1_UPLOAD_CEILING_BYTES: u64 = 75 * 1024 * 1024;
+pub const V1_UPLOAD_CEILING_BYTES: u64 = 40 * 1024 * 1024;
 
 /// Per-file cost of multipart framing: the boundary line, the
 /// `Content-Disposition` and `Content-Type` headers, and the trailing CRLF.
@@ -443,9 +443,14 @@ impl UploadError {
 
     /// Process exit code mirroring the contract documented in the CLI help:
     /// 0 success, 1 user error, 2 server error, 3 unexpected.
+    /// A 4xx the server refused (not a 429) is the caller's to fix, so it exits 1 (GAF-649).
     pub fn exit_code(&self) -> i32 {
         match self {
             UploadError::UserError { .. } => 1,
+            UploadError::ServerError {
+                status: Some(400..=428 | 430..=499),
+                ..
+            } => 1,
             UploadError::ServerError { .. } => 2,
             UploadError::Unexpected { .. } => 3,
         }
@@ -1860,6 +1865,25 @@ mod tests {
         assert_eq!(large.len(), 1);
     }
 
+    /// GAF-645: a 60 MB body ran a PR Worker out of memory mid-parse and a
+    /// 45 MB one uploaded, so a 60 MB log must take MPU while the small
+    /// report beside it still goes as one POST.
+    #[test]
+    fn sixty_mb_log_takes_mpu_and_report_stays_a_post() {
+        let plan = UploadPlan::new(
+            vec![mk("report.json", 10 * 1024), mk("big.log", 60 * MIB)],
+            V1_UPLOAD_CEILING_BYTES,
+            0,
+        );
+        assert_eq!(plan.large.len(), 1);
+        assert_eq!(plan.large[0].relative_path, "big.log");
+        assert_eq!(plan.bundles.len(), 1);
+        const _: () = assert!(
+            V1_UPLOAD_CEILING_BYTES < 45 * MIB,
+            "single POST must stay under the size shown to work"
+        );
+    }
+
     #[test]
     fn tags_length_shrinks_the_usable_budget() {
         let budget = max_content_for("f.bin".len() as u64);
@@ -1878,7 +1902,7 @@ mod tests {
                 "uploadSessionId": "upl_1",
                 "ceiling": 78_643_200u64,
                 "declaredSize": 125_829_120u64,
-                "migration": "https://gaffer.sh/install.sh",
+                "migration": "https://app.gaffer.sh/install.sh",
             },
         })
         .to_string();
@@ -1900,5 +1924,13 @@ mod tests {
         assert_eq!(UploadError::user("k", "x").exit_code(), 1);
         assert_eq!(UploadError::server("k", "x").exit_code(), 2);
         assert_eq!(UploadError::unexpected("k", "x").exit_code(), 3);
+        let rejected = UploadError::server("request_rejected", "x").with_status(400);
+        assert_eq!(rejected.exit_code(), 1);
+        let throttled = UploadError::server("server_error", "x").with_status(429);
+        assert_eq!(throttled.exit_code(), 2);
+        let throttled_any_kind = UploadError::server("request_rejected", "x").with_status(429);
+        assert_eq!(throttled_any_kind.exit_code(), 2);
+        let down = UploadError::server("server_error", "x").with_status(503);
+        assert_eq!(down.exit_code(), 2);
     }
 }

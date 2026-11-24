@@ -28,6 +28,14 @@ macro_rules! debug_timing {
     };
 }
 
+/// End the run as failed on an early-return path, so it never stays `running`.
+/// Best-effort: the caller is already returning the error that matters.
+fn fail_run(core: &GafferCore, run_id: &str) {
+    if let Err(e) = core.fail_run(run_id) {
+        eprintln!("[gaffer] Warning: could not mark run as failed: {}", e);
+    }
+}
+
 /// Run the test command: spawn child, parse reports, store, analyze, print, sync.
 pub fn run(config: &Config, command: &[String], explicit_reports: &[String], format: &OutputFormat, show_errors: bool, compare: Option<&str>, fail_on: Option<&FailOn>) -> Result<i32> {
     // 1. Detect git metadata
@@ -56,9 +64,10 @@ pub fn run(config: &Config, command: &[String], explicit_reports: &[String], for
     // 4. Spawn child process
     // In JSON mode, redirect child stdout to stderr so only gaffer's JSON goes to stdout.
     let json_mode = matches!(format, OutputFormat::Json);
-    let run_start = std::time::SystemTime::now();
+    // Linux stamps mtimes from a coarse clock up to one tick behind now(), so a report written at once can predate it.
+    let run_start = std::time::SystemTime::now() - std::time::Duration::from_millis(100);
     let start = std::time::Instant::now();
-    let exit_code = spawn_child(command, json_mode)?;
+    let exit_code = spawn_child(command, json_mode).inspect_err(|_| fail_run(&core, &run_id))?;
     let duration_ms = start.elapsed().as_millis() as f64;
 
     // 5. Discover report files (only files written during this run)
@@ -78,6 +87,8 @@ pub fn run(config: &Config, command: &[String], explicit_reports: &[String], for
     let mut framework = "unknown".to_string();
     let mut coverage_file: Option<(String, String)> = None; // (content, filename)
     let mut coverage_summary: Option<CoverageSummary> = None;
+    let mut recognized_files = 0;
+    let mut parse_failures: Vec<String> = Vec::new();
 
     for path in &report_files {
         let content = match std::fs::read_to_string(path) {
@@ -101,6 +112,7 @@ pub fn run(config: &Config, command: &[String], explicit_reports: &[String], for
                     );
                 }
                 coverage_file = Some((content, filename));
+                recognized_files += 1;
             }
             Some(parsers::ResultType::TestReport) => {
                 match parsers::parse_report(path, &content) {
@@ -109,13 +121,13 @@ pub fn run(config: &Config, command: &[String], explicit_reports: &[String], for
                             framework = report.framework.clone();
                         }
                         all_tests.extend(report.tests);
+                        recognized_files += 1;
                     }
-                    Err(e) => {
-                        eprintln!("[gaffer] Warning: could not parse {}: {}", path.display(), e);
-                    }
+                    Err(e) => parse_failures.push(format!("{}: {}", path.display(), e)),
                 }
             }
             Some(parsers::ResultType::Mutation) => {
+                recognized_files += 1;
                 // Mutation reports are not recorded locally; `gaffer upload` sends the
                 // file unchanged and the dashboard parses it.
                 eprintln!(
@@ -125,6 +137,7 @@ pub fn run(config: &Config, command: &[String], explicit_reports: &[String], for
                 );
             }
             Some(parsers::ResultType::Findings) => {
+                recognized_files += 1;
                 // SARIF findings are handled like mutation reports: uploaded unchanged.
                 eprintln!(
                     "[gaffer] {} is a SARIF findings report. It is not processed by `gaffer test`; \
@@ -191,6 +204,7 @@ pub fn run(config: &Config, command: &[String], explicit_reports: &[String], for
     let end_run_start = std::time::Instant::now();
     let report = core
         .end_run(&run_id, &run_summary)
+        .inspect_err(|_| fail_run(&core, &run_id))
         .context("Failed to end run")?;
     debug_timing!("[gaffer] End run (finalize + intelligence + payload): {:.1}ms", end_run_start.elapsed().as_secs_f64() * 1000.0);
 
@@ -250,6 +264,18 @@ pub fn run(config: &Config, command: &[String], explicit_reports: &[String], for
         }
     }
 
+    if config.token.is_none() {
+        eprintln!(
+            "\n[gaffer] Results were not uploaded: no project token. \
+             Set GAFFER_PROJECT_TOKEN or pass --token <gfr_…>."
+        );
+    }
+
+    // Printed after the summary so a "0 passed" is never read without its cause (GAF-536).
+    for failure in &parse_failures {
+        eprintln!("\n[gaffer] A report could not be parsed, so its tests are not included in this run: {}", failure);
+    }
+
     if report_files.is_empty() {
         if !explicit_reports.is_empty() {
             eprintln!(
@@ -258,14 +284,23 @@ pub fn run(config: &Config, command: &[String], explicit_reports: &[String], for
             );
         } else {
             eprintln!(
-                "\n[gaffer] No report files found. Configure patterns in gaffer.toml or use --report.\n\
+                "\n[gaffer] No report files found. Looked for files written during this run matching:\n  {}\n\
+                 \n\
+                 Configure patterns in gaffer.toml:\n\
                  \n\
                  [test]\n\
                  report_patterns = [\"**/test-reports/**/*.xml\", \"**/coverage/lcov.info\"]\n\
                  \n\
-                 Or use: gaffer test --report path/to/junit.xml -- <command>"
+                 Or use: gaffer test --report path/to/junit.xml -- <command>",
+                config.report_patterns.join("\n  ")
             );
         }
+    } else if !explicit_reports.is_empty() && recognized_files == 0 {
+        eprintln!(
+            "\n[gaffer] None of the --report files could be parsed. gaffer test reads JUnit XML, TRX, \
+             Jest/Vitest JSON, Playwright JSON and CTRF JSON test reports, and LCOV, Cobertura, \
+             JaCoCo and Clover coverage. To send a file in another format as is, use: gaffer upload <path>"
+        );
     }
 
     // 15. Determine exit code — --fail-on overrides child exit code

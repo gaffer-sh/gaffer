@@ -7,6 +7,9 @@
 //! `synced_at` is set on the test run. On failure, the attempt count is
 //! incremented (max 5 retries).
 //!
+//! Each POST carries the local run id as an `Idempotency-Key` header, so a
+//! server that honours it can drop a repeat of a run it already accepted.
+//!
 //! Uses `ureq` (blocking HTTP) instead of `reqwest` (async) because `sync()`
 //! runs after test output — no need for tokio/async complexity.
 
@@ -16,7 +19,8 @@ use crate::db::Database;
 use crate::types::{CoverageMetrics, FileCoverageEntry, SyncResult};
 use crate::upload::dashboard_session_url;
 
-const MAX_ATTEMPTS: i32 = 5;
+/// Failed sends before an upload is left for `gaffer doctor` to report.
+pub const MAX_ATTEMPTS: i32 = 5;
 const DEFAULT_API_URL: &str = "https://app.gaffer.sh";
 
 /// JSON payload matching the dashboard's IngestPayload type.
@@ -196,6 +200,7 @@ pub fn try_sync(db: &Database, token: &str, api_url: Option<&str>) -> SyncResult
                 synced: 0,
                 failed: 1,
                 dashboard_urls: Vec::new(),
+                unmarked: 0,
             };
         }
     };
@@ -204,11 +209,14 @@ pub fn try_sync(db: &Database, token: &str, api_url: Option<&str>) -> SyncResult
         synced: 0,
         failed: 0,
         dashboard_urls: Vec::new(),
+        unmarked: 0,
     };
 
     // 30-second timeout prevents sync from hanging indefinitely
     let config = ureq::config::Config::builder()
         .timeout_global(Some(std::time::Duration::from_secs(30)))
+        // A 4xx/5xx comes back as Ok, so the failure branch can record the server's body.
+        .http_status_as_error(false)
         .build();
     let agent = ureq::Agent::new_with_config(config);
 
@@ -222,7 +230,8 @@ pub fn try_sync(db: &Database, token: &str, api_url: Option<&str>) -> SyncResult
         let request = agent
             .post(&url)
             .header("X-API-Key", token)
-            .header("Content-Type", "application/json");
+            .header("Content-Type", "application/json")
+            .header("Idempotency-Key", &upload.run_id);
 
         match request.send(upload.payload.as_bytes()) {
             Ok(response) => {
@@ -234,14 +243,21 @@ pub fn try_sync(db: &Database, token: &str, api_url: Option<&str>) -> SyncResult
                         upload.run_id, i + 1, payload_count,
                         payload_bytes / 1024, elapsed.as_secs_f64()
                     );
-                    if let Err(e) = db.mark_synced(upload.id, &upload.run_id) {
-                        eprintln!("[gaffer] Failed to mark upload {} as synced: {}", upload.id, e);
-                        result.failed += 1;
-                    } else {
-                        result.synced += 1;
-                        let body = response.into_body().read_to_string().unwrap_or_default();
-                        result.dashboard_urls.extend(dashboard_url_from_response(api_url, &body));
+                    // The server has the run now: never count it as failed. One retry,
+                    // because a row left behind is sent again by the next sync.
+                    let marked = db
+                        .mark_synced(upload.id, &upload.run_id)
+                        .or_else(|_| db.mark_synced(upload.id, &upload.run_id));
+                    if let Err(e) = marked {
+                        eprintln!(
+                            "[gaffer] Run {} uploaded, but marking it synced locally failed: {}. The next sync may send it again.",
+                            upload.run_id, e
+                        );
+                        result.unmarked += 1;
                     }
+                    result.synced += 1;
+                    let body = response.into_body().read_to_string().unwrap_or_default();
+                    result.dashboard_urls.extend(dashboard_url_from_response(api_url, &body));
                 } else {
                     let body = match response.into_body().read_to_string() {
                         Ok(b) => b,
@@ -288,6 +304,89 @@ mod tests {
         let db_path = dir.path().join("data.db");
         let db = Database::open(&db_path).unwrap();
         (db, dir)
+    }
+
+    /// Serve one request with `status_line`, handing the raw request head back.
+    fn mock_ingest(status_line: &'static str) -> (String, std::sync::mpsc::Receiver<String>) {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut buf = vec![0u8; 16384];
+            let n = stream.read(&mut buf).unwrap();
+            tx.send(String::from_utf8_lossy(&buf[..n]).to_string()).unwrap();
+            let body = r#"{"uploadSessionId":"upl_1"}"#;
+            let response = format!(
+                "{status_line}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                body.len()
+            );
+            stream.write_all(response.as_bytes()).unwrap();
+        });
+        (format!("http://{addr}"), rx)
+    }
+
+    fn db_with_pending_upload() -> (Database, TempDir) {
+        let (db, dir) = test_db();
+        let metadata = RunMetadata {
+            branch: None,
+            commit: None,
+            ci_provider: None,
+            framework: "vitest".to_string(),
+        };
+        db.insert_run("run-1", &metadata, "2026-02-22T10:00:00Z").unwrap();
+        db.insert_pending_upload("run-1", r#"{"runId":"run-1"}"#).unwrap();
+        (db, dir)
+    }
+
+    #[test]
+    fn try_sync_sends_the_run_id_as_an_idempotency_key() {
+        let (db, _dir) = db_with_pending_upload();
+        let (base, requests) = mock_ingest("HTTP/1.1 202 Accepted");
+
+        let result = try_sync(&db, "gfr_test", Some(&base));
+
+        let request = requests.recv().unwrap().to_ascii_lowercase();
+        assert!(request.contains("idempotency-key: run-1\r\n"), "{request}");
+        assert_eq!((result.synced, result.failed, result.unmarked), (1, 0, 0));
+        assert!(db.get_pending_uploads(MAX_ATTEMPTS).unwrap().is_empty());
+    }
+
+    #[test]
+    fn a_failed_local_mark_after_the_server_accepts_is_not_a_failed_upload() {
+        let (db, dir) = db_with_pending_upload();
+        // A second connection makes every delete of the pending row fail.
+        rusqlite::Connection::open(dir.path().join("data.db"))
+            .unwrap()
+            .execute_batch(
+                "CREATE TRIGGER block_mark BEFORE DELETE ON pending_uploads
+                 BEGIN SELECT RAISE(ABORT, 'disk is full'); END;",
+            )
+            .unwrap();
+        let (base, _requests) = mock_ingest("HTTP/1.1 202 Accepted");
+
+        let result = try_sync(&db, "gfr_test", Some(&base));
+
+        assert_eq!((result.synced, result.failed, result.unmarked), (1, 0, 1));
+        // Not recorded as a send failure, so it does not burn a retry.
+        assert_eq!(db.get_pending_uploads(MAX_ATTEMPTS).unwrap()[0].attempts, 0);
+    }
+
+    #[test]
+    fn a_rejected_sync_records_the_server_response_body() {
+        let (db, dir) = db_with_pending_upload();
+        let (base, _requests) = mock_ingest("HTTP/1.1 402 Payment Required");
+
+        let result = try_sync(&db, "gfr_test", Some(&base));
+
+        assert_eq!((result.synced, result.failed), (0, 1));
+        let last_error: String = rusqlite::Connection::open(dir.path().join("data.db"))
+            .unwrap()
+            .query_row("SELECT last_error FROM pending_uploads", [], |row| row.get(0))
+            .unwrap();
+        assert!(last_error.starts_with("HTTP 402 "), "{last_error}");
+        assert!(last_error.ends_with(r#": {"uploadSessionId":"upl_1"}"#), "{last_error}");
     }
 
     #[test]

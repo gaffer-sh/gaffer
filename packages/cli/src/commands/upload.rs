@@ -29,8 +29,9 @@ pub struct UploadArgs {
 
 /// Run the upload. Returns a process exit code:
 /// * `0` — success.
-/// * `1` — user error (missing token, file too large, path not found).
-/// * `2` — server error (4xx/5xx, network).
+/// * `1` — user error (missing token, file too large, path not found, a 4xx
+///   other than 429).
+/// * `2` — server error (5xx, 429, network).
 /// * `3` — unexpected (panic in a part task, JSON parse, runtime init).
 pub fn run(args: UploadArgs) -> i32 {
     let api_url = args.api_url.or_else(|| std::env::var("GAFFER_API_URL").ok());
@@ -101,15 +102,8 @@ fn resolve_token(flag: Option<String>, api_url: Option<&str>) -> Result<String, 
     if let Some(t) = flag.filter(|s| !s.is_empty()) {
         return Ok(t);
     }
-    // Canonical env var is GAFFER_PROJECT_TOKEN. Older configurations may
-    // set GAFFER_UPLOAD_TOKEN (the previous name) or GAFFER_TOKEN — both
-    // remain supported as fallbacks so existing CI keeps working.
-    for var in ["GAFFER_PROJECT_TOKEN", "GAFFER_UPLOAD_TOKEN", "GAFFER_TOKEN"] {
-        if let Ok(t) = std::env::var(var) {
-            if !t.is_empty() {
-                return Ok(t);
-            }
-        }
+    if let Some(t) = crate::config::token_from_env() {
+        return Ok(t);
     }
 
     if let Some(result) = oidc::try_exchange(api_url) {
@@ -276,10 +270,11 @@ fn suggested_fix(err: &UploadError) -> &'static str {
         UploadError::ServerError { kind, .. } => match *kind {
             "auth_failed" => "regenerate the project token in the project's settings",
             "quota_exceeded" => "upgrade the plan or remove old reports to free space",
-            "file_too_large" => "gaffer already re-routes around the server's stated limit; if this persists, upgrade the CLI (https://gaffer.sh/install.sh) and rerun with --debug",
+            "file_too_large" => "gaffer already re-routes around the server's stated limit; if this persists, upgrade the CLI (https://app.gaffer.sh/install.sh) and rerun with --debug",
             "server_error" => "retry; if it persists, contact support with the Ray ID",
             "network" => "retry from a host with network access to the dashboard",
             "empty_response" => "check the dashboard for the upload session before retrying — the upload may already have landed",
+            "request_rejected" => "fix what the server's message names; retrying the same upload will fail the same way",
             _ => "retry; if it persists, share the JSON error line with support",
         },
         UploadError::Unexpected { .. } => "rerun with --debug and share the full output with support",
@@ -291,7 +286,7 @@ mod tests {
     use super::*;
     use crate::oidc::ENV_MUTEX;
 
-    const TOKEN_VARS: [&str; 3] = ["GAFFER_PROJECT_TOKEN", "GAFFER_UPLOAD_TOKEN", "GAFFER_TOKEN"];
+    use crate::config::TOKEN_ENV_VARS as TOKEN_VARS;
     const OIDC_VARS: [&str; 2] = ["ACTIONS_ID_TOKEN_REQUEST_URL", "ACTIONS_ID_TOKEN_REQUEST_TOKEN"];
 
     fn clear_token_env() {
@@ -315,6 +310,16 @@ mod tests {
         let json = success_json(&outcome);
 
         assert_eq!(json["dashboardUrl"], "https://app.gaffer.sh/projects/prj_1/uploads/upl_1");
+    }
+
+    #[test]
+    fn a_rejected_upload_gives_no_retry_advice_and_exits_as_a_user_error() {
+        let msg = "Upload failed (400): No parseable files provided.";
+        let err = UploadError::server("request_rejected", msg).with_status(400);
+
+        assert!(!suggested_fix(&err).contains("retry;"));
+        assert_eq!(err.to_string(), msg);
+        assert_eq!(error_json(&err)["exitCode"], 1);
     }
 
     #[test]

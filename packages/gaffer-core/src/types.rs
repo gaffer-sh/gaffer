@@ -32,6 +32,31 @@ pub mod status {
     pub const TODO: &str = "todo";
 }
 
+/// Lifecycle of a local `test_runs` row: `Running` until it ends in one of the others.
+/// Stored as `as_str()`; migration 004 CHECK-constrains the column to these values.
+/// Local analytics read `Finished` runs only, so `Failed` and `Interrupted` runs
+/// (no results) never feed flaky detection, health or comparisons.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RunStatus {
+    Running,
+    Finished,
+    /// The test command never ran (spawn failure) or the run could not be finalized.
+    Failed,
+    /// The `gaffer` process died mid-run (Ctrl-C, kill); found by a later `start_run`.
+    Interrupted,
+}
+
+impl RunStatus {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Running => "running",
+            Self::Finished => "finished",
+            Self::Failed => "failed",
+            Self::Interrupted => "interrupted",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TestEvent {
     /// Fully qualified test name including describe blocks
@@ -362,6 +387,10 @@ pub struct SyncResult {
     /// One per synced run whose response named its project.
     #[serde(default)]
     pub dashboard_urls: Vec<String>,
+    /// Of `synced`: runs the server accepted whose local row could not be
+    /// marked synced, so a later sync may send them again.
+    #[serde(default)]
+    pub unmarked: u32,
 }
 
 /// A pending upload row from SQLite (internal).
@@ -371,6 +400,14 @@ pub struct PendingUpload {
     pub run_id: String,
     pub payload: String,
     pub attempts: i32,
+}
+
+/// A pending upload that used up its retries; sync no longer sends it.
+#[derive(Debug, Clone)]
+pub struct ExhaustedUpload {
+    pub run_id: String,
+    pub attempts: i32,
+    pub last_error: Option<String>,
 }
 
 // =============================================================================

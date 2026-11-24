@@ -60,14 +60,24 @@ impl GafferCore {
     }
 
     /// Start a new test run. Returns the generated UUID run_id.
+    /// First ends, as `Interrupted`, runs a killed `gaffer` process left `Running`.
     pub fn start_run(&self, metadata: RunMetadata) -> Result<String, GafferError> {
         let run_id = uuid::Uuid::new_v4().to_string();
         let started_at = chrono::Utc::now().to_rfc3339();
 
         let db = self.lock_db()?;
+        db.interrupt_stale_runs(&stale_run_cutoff())?;
         db.insert_run(&run_id, &metadata, &started_at)?;
 
         Ok(run_id)
+    }
+
+    /// End a run that cannot finish (the test command failed to spawn) as `Failed`.
+    /// A no-op on a run that already ended.
+    pub fn fail_run(&self, run_id: &str) -> Result<(), GafferError> {
+        let db = self.lock_db()?;
+        db.fail_run(run_id, &chrono::Utc::now().to_rfc3339())?;
+        Ok(())
     }
 
     /// Update the framework for a run (detected from parsed report files).
@@ -151,6 +161,7 @@ impl GafferCore {
                     synced: 0,
                     failed: 0,
                     dashboard_urls: Vec::new(),
+                    unmarked: 0,
                 });
             }
         };
@@ -161,6 +172,21 @@ impl GafferCore {
             &token,
             self.config.api_url.as_deref(),
         ))
+    }
+
+    /// Uploads that failed `sync::MAX_ATTEMPTS` times and are no longer sent.
+    pub fn exhausted_uploads(&self) -> Result<Vec<ExhaustedUpload>, GafferError> {
+        Ok(self.lock_db()?.get_exhausted_uploads(sync::MAX_ATTEMPTS)?)
+    }
+
+    /// Give exhausted uploads a fresh set of attempts. Returns how many.
+    pub fn retry_exhausted_uploads(&self) -> Result<usize, GafferError> {
+        Ok(self.lock_db()?.reset_exhausted_uploads(sync::MAX_ATTEMPTS)?)
+    }
+
+    /// Drop exhausted uploads without sending them. Returns how many.
+    pub fn purge_exhausted_uploads(&self) -> Result<usize, GafferError> {
+        Ok(self.lock_db()?.purge_exhausted_uploads(sync::MAX_ATTEMPTS)?)
     }
 
     /// Record coverage data for a run. Auto-detects coverage format and stores summary.
@@ -638,6 +664,13 @@ impl GafferCore {
                 - pct(baseline_cov.functions.covered, baseline_cov.functions.total),
         })
     }
+}
+
+/// A `Running` run older than this was left by a killed process: no signal crate is
+/// in the tree to end it on Ctrl-C. shortcut: an age cutoff, not a liveness check;
+/// a real SIGINT/SIGTERM handler needs `signal-hook` or tokio's `signal` feature.
+fn stale_run_cutoff() -> String {
+    (chrono::Utc::now() - chrono::Duration::hours(24)).to_rfc3339()
 }
 
 /// Start of the window `zero_test_runs_7d` counts over, in the RFC 3339 form `started_at` uses.

@@ -187,6 +187,16 @@ pub fn print_sync(result: &SyncResult) {
             eprintln!("   {url}");
         }
     }
+    if result.unmarked > 0 {
+        eprintln!(
+            "{}",
+            format!(
+                "Sync: {} uploaded but not marked synced locally (may upload again)",
+                plural(result.unmarked as usize, "run")
+            )
+            .yellow()
+        );
+    }
     if result.failed > 0 {
         eprintln!(
             "{}",

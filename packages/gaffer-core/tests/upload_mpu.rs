@@ -470,7 +470,7 @@ impl Respond for V1CeilingServer {
                 "statusMessage": "File exceeds maximum size of 75MB",
                 "data": {
                     "reason": "file_too_large_for_v1",
-                    "migration": "https://gaffer.sh/install.sh",
+                    "migration": "https://app.gaffer.sh/install.sh",
                     "ceiling": self.ceiling,
                     "declaredSize": declared,
                 },
@@ -519,14 +519,14 @@ async fn mount_session(server: &MockServer, session_id: &str, opens: u64) {
 /// HTML report's assets from the report's own session, and rejects any
 /// session holding no parseable file.
 ///
-/// Two 40 MiB files rather than many 1 MiB ones: same routing decision at
-/// HEAD (largest < 90 MiB, total < 200 MiB → one POST), a third of the I/O.
+/// Two 25 MiB files rather than many 1 MiB ones: each fits the 40 MiB
+/// ceiling alone but not together, a fraction of the I/O.
 #[tokio::test]
 async fn bundle_between_the_ceiling_and_the_old_threshold_splits_into_one_session() {
     let server = MockServer::start().await;
     let dir = TempDir::new().unwrap();
-    let a = make_file(&dir, "index.html", 40 * 1024 * 1024);
-    let b = make_file(&dir, "shot.png", 40 * 1024 * 1024);
+    let a = make_file(&dir, "index.html", 25 * 1024 * 1024);
+    let b = make_file(&dir, "shot.png", 25 * 1024 * 1024);
 
     mount_session(&server, "upl_multi", 1).await;
     Mock::given(method("POST"))
@@ -535,7 +535,7 @@ async fn bundle_between_the_ceiling_and_the_old_threshold_splits_into_one_sessio
         .respond_with(V1CeilingServer {
             ceiling: upload::V1_UPLOAD_CEILING_BYTES,
         })
-        // Exactly two appends: one per 40 MiB bundle. Three would mean we
+        // Exactly two appends: one per 25 MiB bundle. Three would mean we
         // wasted a round-trip discovering the ceiling we already knew.
         .expect(2)
         .mount(&server)
@@ -618,12 +618,12 @@ async fn large_artifact_joins_the_reports_session_over_mpu() {
 async fn append_413_replans_within_the_same_session() {
     let server = MockServer::start().await;
     let dir = TempDir::new().unwrap();
-    let a = make_file(&dir, "a.xml", 40 * 1024 * 1024);
-    let b = make_file(&dir, "b.xml", 40 * 1024 * 1024);
-    // A server whose real ceiling (30 MiB) is lower than the client's: each
-    // 40 MiB bundle is rejected once, and at 30 MiB its file can only go
+    let a = make_file(&dir, "a.xml", 25 * 1024 * 1024);
+    let b = make_file(&dir, "b.xml", 25 * 1024 * 1024);
+    // A server whose real ceiling (20 MiB) is lower than the client's: each
+    // 25 MiB bundle is rejected once, and at 25 MiB its file can only go
     // over MPU, joined to the same session.
-    let lower = 30 * 1024 * 1024;
+    let lower = 20 * 1024 * 1024;
 
     mount_session(&server, "upl_multi", 1).await;
     Mock::given(method("POST"))
@@ -779,7 +779,7 @@ async fn v1_ceiling_413_replans_the_bundle_through_mpu() {
                 "reason": "file_too_large_for_v1",
                 "uploadSessionId": "upl_413",
                 "cfRayId": null,
-                "migration": "https://gaffer.sh/install.sh",
+                "migration": "https://app.gaffer.sh/install.sh",
                 "ceiling": 1024,
                 "declaredSize": 3000,
             },

@@ -7,7 +7,7 @@ use std::time::SystemTime;
 
 use anyhow::Result;
 use colored::Colorize;
-use gaffer_core::types::GafferConfig;
+use gaffer_core::types::{ExhaustedUpload, GafferConfig};
 use gaffer_core::GafferCore;
 
 use crate::config::Config;
@@ -191,19 +191,35 @@ fn check_pending(config: &Config) {
         project_root: config.project_root.to_string_lossy().to_string(),
     });
 
-    match core {
-        Ok(_core) => {
-            // We can't easily query pending uploads count without exposing a new method,
-            // so we check if the DB path exists and the sync result
-            let db_path = config.project_root.join(".gaffer/data.db");
-            if db_path.exists() {
-                pass("Sync", "Database accessible for sync operations");
+    // An open error was already reported by the database check.
+    let Ok(core) = core else { return };
+    match core.exhausted_uploads() {
+        Ok(exhausted) if exhausted.is_empty() => pass("Sync", "No uploads stuck after failed retries"),
+        Ok(exhausted) => {
+            for line in exhausted_upload_lines(&exhausted) {
+                warn("Sync", &line);
             }
         }
-        Err(_) => {
-            // Already reported in database check
-        }
+        Err(e) => fail("Sync", &format!("Could not read pending uploads: {}", e)),
     }
+}
+
+/// One line per upload sync gave up on, then the commands that clear them.
+fn exhausted_upload_lines(exhausted: &[ExhaustedUpload]) -> Vec<String> {
+    let mut lines = vec![format!(
+        "{} stopped retrying after repeated failures:",
+        if exhausted.len() == 1 { "1 upload".to_string() } else { format!("{} uploads", exhausted.len()) }
+    )];
+    for upload in exhausted {
+        lines.push(format!(
+            "  run {} ({} attempts): {}",
+            upload.run_id,
+            upload.attempts,
+            upload.last_error.as_deref().unwrap_or("no error recorded")
+        ));
+    }
+    lines.push("Run `gaffer sync --retry-exhausted` to send them again, or `gaffer sync --purge-exhausted` to drop them.".to_string());
+    lines
 }
 
 fn check_frameworks(config: &Config) {
@@ -219,4 +235,22 @@ fn check_frameworks(config: &Config) {
 fn check_version() {
     let version = env!("CARGO_PKG_VERSION");
     pass("Version", &format!("gaffer {}", version));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn exhausted_uploads_are_listed_with_their_last_error_and_the_fix() {
+        let lines = exhausted_upload_lines(&[
+            ExhaustedUpload { run_id: "run-1".into(), attempts: 5, last_error: Some("HTTP 500 (0.2s): boom".into()) },
+            ExhaustedUpload { run_id: "run-2".into(), attempts: 5, last_error: None },
+        ]);
+
+        assert_eq!(lines[0], "2 uploads stopped retrying after repeated failures:");
+        assert_eq!(lines[1], "  run run-1 (5 attempts): HTTP 500 (0.2s): boom");
+        assert_eq!(lines[2], "  run run-2 (5 attempts): no error recorded");
+        assert!(lines[3].contains("--retry-exhausted") && lines[3].contains("--purge-exhausted"));
+    }
 }

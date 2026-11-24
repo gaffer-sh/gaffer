@@ -105,6 +105,11 @@ pub const DEFAULT_REPORT_PATTERNS: &[&str] = &[
     "**/test-results/**/*.xml",
     "**/test-reports/**/*.xml",
     "**/target/nextest/**/*.xml",
+    "**/target/surefire-reports/TEST-*.xml",
+    "**/TestResults/*.trx",
+    // The file names the onboarding wizard's `--outputFile` uses; Jest and Vitest have no default.
+    "**/jest-results.json",
+    "**/vitest-results.json",
     "**/ctrf/**/*.json",
     "**/ctrf-report.json",
     "**/coverage/lcov.info",
@@ -189,7 +194,7 @@ impl Config {
         // which resolve their token through here) get identical behavior.
         let (token, token_source) = resolve_field_5(
             cli_token.map(|s| s.to_string()),
-            || std::env::var("GAFFER_TOKEN").ok(),
+            token_from_env,
             || explicit.as_ref().and_then(|c| c.project.as_ref().and_then(|p| p.token.clone())),
             || local_config.as_ref().and_then(|c| c.project.as_ref().and_then(|p| p.token.clone())),
             || global.as_ref().and_then(|c| c.project.as_ref().and_then(|p| p.token.clone())),
@@ -203,7 +208,7 @@ impl Config {
                 Some(Err(e)) => {
                     eprintln!(
                         "[gaffer] Warning: GitHub Actions OIDC token exchange failed: {}. \
-                         Pass --token, set GAFFER_TOKEN, or check that this job was granted \
+                         Pass --token, set GAFFER_PROJECT_TOKEN, or check that this job was granted \
                          `permissions: id-token: write`.",
                         e
                     );
@@ -477,6 +482,18 @@ fn set_restrictive_permissions(path: &Path) {
     }
     #[cfg(not(unix))]
     let _ = path;
+}
+
+/// Env vars that carry the project token, in lookup order. Every command reads
+/// the same list. GAFFER_PROJECT_TOKEN is canonical; the other two are older
+/// names kept so existing CI keeps working.
+pub const TOKEN_ENV_VARS: [&str; 3] = ["GAFFER_PROJECT_TOKEN", "GAFFER_UPLOAD_TOKEN", "GAFFER_TOKEN"];
+
+/// The first non-empty token from `TOKEN_ENV_VARS`.
+pub fn token_from_env() -> Option<String> {
+    TOKEN_ENV_VARS
+        .iter()
+        .find_map(|var| std::env::var(var).ok().filter(|t| !t.is_empty()))
 }
 
 /// Mask a token for display, showing only a prefix and suffix.
@@ -901,5 +918,36 @@ mod tests {
         assert!(content.contains("api_url = \"https://api\""));
         assert!(content.contains("[test]"));
         assert!(content.contains("**/*.xml"));
+    }
+
+    #[test]
+    fn resolve_reads_every_token_env_var_in_upload_order() {
+        let _lock = ENV_MUTEX.lock().unwrap();
+        let tmp = TempDir::new().unwrap();
+        let original_xdg = std::env::var("XDG_CONFIG_HOME").ok();
+        std::env::set_var("XDG_CONFIG_HOME", tmp.path());
+        let clear = || {
+            for var in TOKEN_ENV_VARS {
+                std::env::remove_var(var);
+            }
+        };
+        clear();
+
+        // Set the vars lowest-priority first: each new one must take over.
+        let mut resolved = Vec::new();
+        for var in TOKEN_ENV_VARS.iter().rev() {
+            std::env::set_var(var, format!("tok-{var}"));
+            resolved.push((*var, Config::resolve(None, None, &[], tmp.path(), None)));
+        }
+        clear();
+        match original_xdg {
+            Some(v) => std::env::set_var("XDG_CONFIG_HOME", v),
+            None => std::env::remove_var("XDG_CONFIG_HOME"),
+        }
+
+        for (var, config) in &resolved {
+            assert_eq!(config.token, Some(format!("tok-{var}")));
+            assert_eq!(config.sources.token, ConfigSource::EnvVar);
+        }
     }
 }
